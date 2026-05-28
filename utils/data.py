@@ -169,7 +169,11 @@ def autenticar(usuario, senha):
     df = ler("usuarios")
     if df.empty: return None
     user_row = df[(df["usuario"] == usuario) & (df["senha"] == senha) & (df["ativo"] == "Sim")]
-    if not user_row.empty: return user_row.iloc[0].to_dict()
+    if not user_row.empty:
+        r = user_row.iloc[0].to_dict()
+        if "nome_completo" in r:
+            r["nome"] = r["nome_completo"]
+        return r
     return None
 
 def status_item(saldo, minimo):
