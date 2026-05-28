@@ -74,7 +74,7 @@ def sheets_ok():
     except Exception:
         return False
 
-def inicializar_sheets(df_itens, df_estoque, df_fornecedores):
+def inicializar_sheets(df_itens, df_estoque, df_fornecedores, df_movimentos, df_usuarios):
     """Envia todos os dados para o Sheets em lote (batch). Lança exceção se falhar."""
     import pandas as pd
     sh = _conectar()  # vai lançar exceção se falhar — sem silêncio
@@ -82,6 +82,7 @@ def inicializar_sheets(df_itens, df_estoque, df_fornecedores):
         ("ITENS",        df_itens),
         ("ESTOQUE",      df_estoque),
         ("FORNECEDORES", df_fornecedores),
+        ("MOVIMENTOS",   df_movimentos),
     ]:
         ws   = _get_sheet(sh, nome_aba)
         cols = [c for c in HEADERS[nome_aba] if c in df.columns]
