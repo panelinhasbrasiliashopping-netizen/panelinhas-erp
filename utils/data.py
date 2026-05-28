@@ -162,6 +162,7 @@ def registrar_movimento(tipo, id_item, quantidade, operador, valor_unit="", forn
 def listar_movimentos(limit=200):
     df = ler("movimentos")
     if df.empty: return df
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     df = df.sort_values("timestamp", ascending=False).head(limit)
     return df
 
