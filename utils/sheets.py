@@ -1,5 +1,7 @@
 import re
 import streamlit as st
+import time
+import random
 from datetime import datetime
 from pathlib import Path
 
@@ -22,31 +24,33 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
+def executar_com_retry(func, *args, max_retries=3, base_delay=2.0, **kwargs):
+    """Executa uma função da API do Google Sheets com retentativas e recuo exponencial."""
+    for tentativa in range(max_retries):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            if tentativa == max_retries - 1:
+                raise e
+            delay = base_delay * (2 ** tentativa) + random.uniform(0.1, 1.0)
+            time.sleep(delay)
+
 def _ler_credenciais():
-    """Lê o secrets.toml diretamente do disco — sem cache."""
-    secrets_path = Path(__file__).parent.parent / ".streamlit" / "secrets.toml"
-    content = secrets_path.read_text(encoding="utf-8")
-
-    def extract(field):
-        m = re.search(rf'{field}\s*=\s*"([^"]+)"', content)
-        return m.group(1) if m else ""
-
-    key_match = re.search(r'private_key\s*=\s*"""(.*?)"""', content, re.DOTALL)
-    if not key_match:
-        key_match = re.search(r'private_key\s*=\s*"(.*?)"', content, re.DOTALL)
-    pk = key_match.group(1).replace('\\n', '\n') if key_match else ""
-
+    """Lê o secrets.toml diretamente do st.secrets."""
+    import streamlit as st
+    gcp = st.secrets["gcp_service_account"]
+    pk = gcp["private_key"].replace('\\n', '\n')
     return {
-        "type": "service_account",
-        "project_id":   extract("project_id"),
-        "private_key_id": extract("private_key_id"),
-        "private_key":  pk,
-        "client_email": extract("client_email"),
-        "client_id":    extract("client_id"),
-        "auth_uri":     extract("auth_uri"),
-        "token_uri":    extract("token_uri"),
-        "auth_provider_x509_cert_url": extract("auth_provider_x509_cert_url"),
-        "client_x509_cert_url": extract("client_x509_cert_url"),
+        "type": gcp["type"],
+        "project_id": gcp["project_id"],
+        "private_key_id": gcp["private_key_id"],
+        "private_key": pk,
+        "client_email": gcp["client_email"],
+        "client_id": gcp["client_id"],
+        "auth_uri": gcp["auth_uri"],
+        "token_uri": gcp["token_uri"],
+        "auth_provider_x509_cert_url": gcp["auth_provider_x509_cert_url"],
+        "client_x509_cert_url": gcp["client_x509_cert_url"],
     }
 
 def _conectar():
@@ -69,24 +73,24 @@ def _get_sheet(sh, nome_aba):
 
 def sheets_ok():
     try:
-        _conectar()
+        executar_com_retry(_conectar)
         return True
     except Exception:
         return False
 
-def inicializar_sheets(df_itens, df_estoque, df_fornecedores, df_movimentos, df_usuarios):
+def inicializar_sheets(df_itens, df_estoque, df_fornecedores, df_movimentos, df_usuarios=None):
     """Envia todos os dados para o Sheets em lote (batch). Lança exceção se falhar."""
     import pandas as pd
-    sh = _conectar()  # vai lançar exceção se falhar — sem silêncio
+    sh = executar_com_retry(_conectar)
     for nome_aba, df in [
         ("ITENS",        df_itens),
         ("ESTOQUE",      df_estoque),
         ("FORNECEDORES", df_fornecedores),
         ("MOVIMENTOS",   df_movimentos),
     ]:
-        ws   = _get_sheet(sh, nome_aba)
+        ws   = executar_com_retry(_get_sheet, sh, nome_aba)
         cols = [c for c in HEADERS[nome_aba] if c in df.columns]
-        ws.clear()
+        executar_com_retry(ws.clear)
         
         # Constrói o lote de dados (cabeçalho + linhas)
         rows_to_write = [cols]
@@ -101,32 +105,32 @@ def inicializar_sheets(df_itens, df_estoque, df_fornecedores, df_movimentos, df_
             
         # Envia todas as linhas de uma vez só (1 única chamada de API)
         try:
-            ws.update(rows_to_write)
+            executar_com_retry(ws.update, rows_to_write)
         except TypeError:
             # Compatibilidade com versões mais antigas do gspread
-            ws.update("A1", rows_to_write)
+            executar_com_retry(ws.update, "A1", rows_to_write)
 
 def sincronizar_movimento(linha: dict):
     try:
-        sh  = _conectar()
-        ws  = _get_sheet(sh, "MOVIMENTOS")
+        sh  = executar_com_retry(_conectar)
+        ws  = executar_com_retry(_get_sheet, sh, "MOVIMENTOS")
         row = [str(linha.get(h, "")) for h in HEADERS["MOVIMENTOS"]]
-        ws.append_row(row)
+        executar_com_retry(ws.append_row, row)
         return True
     except Exception:
         return False
 
 def sincronizar_saldo(id_item, nome, categoria, local, unidade, saldo):
     try:
-        sh    = _conectar()
-        ws    = _get_sheet(sh, "ESTOQUE")
-        dados = ws.get_all_values()
+        sh    = executar_com_retry(_conectar)
+        ws    = executar_com_retry(_get_sheet, sh, "ESTOQUE")
+        dados = executar_com_retry(ws.get_all_values)
         for i, row in enumerate(dados[1:], start=2):
             if row and row[0] == id_item:
-                ws.update_cell(i, 6, str(round(saldo, 3)))
-                ws.update_cell(i, 7, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                executar_com_retry(ws.update_cell, i, 6, str(round(saldo, 3)))
+                executar_com_retry(ws.update_cell, i, 7, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 return True
-        ws.append_row([id_item, nome, categoria, local, unidade,
+        executar_com_retry(ws.append_row, [id_item, nome, categoria, local, unidade,
                        str(round(saldo, 3)),
                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
         return True
