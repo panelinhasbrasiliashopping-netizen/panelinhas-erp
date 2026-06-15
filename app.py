@@ -8,12 +8,45 @@ sys.path.insert(0, str(Path(__file__).parent))
 from utils.data import (autenticar, listar_itens, listar_fornecedores,
                         listar_composicao, composicao_produto, is_composto,
                         registrar_saida_composta, registrar_movimento_batch,
-                        registrar_saida_em_lote,
+                        registrar_saida_em_lote, listar_mapeamentos,
                         listar_estoque, listar_movimentos, registrar_movimento,
-                        saldo_item, status_item)
+                        saldo_item, status_item, limpar_cache)
 from utils.logo import LOGO_B64
 
 st.set_page_config(page_title="Panelinhas do Brasil", page_icon="🍳", layout="wide")
+
+from utils.data import verificar_configuracao
+if not verificar_configuracao():
+    st.markdown("""
+    <div style="
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-radius: 16px;
+        padding: 2.5rem;
+        margin-top: 3rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+    ">
+        <div style="color: #EF4444; font-size: 24px; font-weight: 700; margin-bottom: 1rem;">
+            ⚠️ Erro de Configuração Detectado
+        </div>
+        <div style="color: #E2E8F0; font-size: 15px; line-height: 1.6; margin-bottom: 1.5rem;">
+            O aplicativo não pôde se conectar ao banco de dados Supabase porque as chaves de acesso estão ausentes ou incorretas nas <strong>Secrets</strong> do Streamlit.
+        </div>
+        <div style="background: rgba(0, 0, 0, 0.2); padding: 1.2rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="font-weight: 600; color: #FFF8F0; margin-bottom: 8px; font-size: 14px;">Como corrigir no Streamlit Cloud:</div>
+            <ol style="margin: 0; padding-left: 1.2rem; color: #94A3B8; font-size: 14px;">
+                <li style="margin-bottom: 0.5rem;">Acesse o painel do <strong>Streamlit Cloud</strong> e vá nas configurações do app (<em>Manage App &gt; Settings &gt; Secrets</em>).</li>
+                <li style="margin-bottom: 0.5rem;">Adicione as chaves necessárias no formato abaixo:</li>
+            </ol>
+            <pre style="color: #FF7B25; background: #1E1A17; padding: 10px; border-radius: 6px; margin-top: 10px; font-family: monospace; border: 1px solid rgba(232, 93, 4, 0.15); font-size: 13px;">
+SUPABASE_URL = "sua-url-do-supabase"
+SUPABASE_KEY = "sua-chave-do-supabase"
+            </pre>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()
 
 st.markdown("""
 <style>
@@ -31,10 +64,26 @@ st.markdown("""
 [data-testid="stSidebarCollapseButton"],
 [data-testid="stToolbar"] { display:none !important; }
 
+[data-testid="stApp"],
+[data-testid="stAppViewContainer"] { background: #141210 !important; }
+
 html, body, [class*="css"], .stMarkdown, .stText,
 select, input, textarea, button, label, p, span, div, h1, h2, h3, h4, h5, h6,
 [data-testid="stMarkdownContainer"] {
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+[data-testid="stMarkdownContainer"], 
+[data-testid="stMarkdownContainer"] p, 
+[data-testid="stMarkdownContainer"] span, 
+[data-testid="stMarkdownContainer"] li, 
+[data-testid="stMarkdownContainer"] strong,
+[data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3,
+[data-testid="stMarkdownContainer"] h4,
+[data-testid="stMarkdownContainer"] h5,
+[data-testid="stMarkdownContainer"] h6 {
+    color: #FFF8F0 !important;
 }
 .block-container {
     padding-top: 1rem !important;
@@ -94,6 +143,26 @@ select, input, textarea, button, label, p, span, div, h1, h2, h3, h4, h5, h6,
 .main .stButton > button[kind="primary"]:active {
     transform: translateY(0px) !important;
     box-shadow: 0 2px 8px rgba(232, 93, 12, 0.2) !important;
+}
+
+/* ── Botões Secundários da Tela Principal ────────────────── */
+.main .stButton > button[kind="secondary"],
+.main [data-testid="stDownloadButton"] > button,
+.main [data-testid="stFormSubmitButton"] > button[kind="secondary"] {
+    background: #1E1A17 !important;
+    border: 1px solid #332B25 !important;
+    color: #FFF8F0 !important;
+    border-radius: 10px !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease !important;
+}
+.main .stButton > button[kind="secondary"]:hover,
+.main [data-testid="stDownloadButton"] > button:hover,
+.main [data-testid="stFormSubmitButton"] > button[kind="secondary"]:hover {
+    border-color: #E85D0C !important;
+    background: #2A2420 !important;
+    color: #fff !important;
 }
 
 /* ── Cards de Métricas ─────────────────────────────────── */
@@ -199,14 +268,14 @@ select, input, textarea, button, label, p, span, div, h1, h2, h3, h4, h5, h6,
     font-family: 'Outfit', sans-serif;
     font-size: 24px;
     font-weight: 800;
-    color: #1a1a1a;
+    color: #FFF8F0 !important;
     letter-spacing: -0.3px;
 }
 .ph p {
     margin: 0;
     font-family: 'Outfit', sans-serif;
     font-size: 13px;
-    color: #888;
+    color: #A99A90 !important;
     font-weight: 400;
 }
 
@@ -260,7 +329,7 @@ hr {
 ::-webkit-scrollbar-thumb:hover { background: rgba(232, 93, 12, 0.4); }
 
 /* ── Coluna do Menu Lateral (fundo escuro em toda a coluna) ── */
-[data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {
+[data-testid="stColumn"]:has(.sidebar-marker) {
     background: linear-gradient(180deg, #151515 0%, #1A1A1A 60%, #1E1E1E 100%) !important;
     border-right: 2px solid rgba(232, 93, 12, 0.3) !important;
     padding: 12px 8px 16px !important;
@@ -268,7 +337,7 @@ hr {
     border-radius: 0 !important;
 }
 /* Garante que botões dentro da coluna do menu herdem o estilo escuro */
-[data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child .stButton > button[kind="secondary"] {
+[data-testid="stColumn"]:has(.sidebar-marker) .stButton > button[kind="secondary"] {
     background: rgba(255,255,255,0.03) !important;
     border: none !important;
     border-left: 3px solid transparent !important;
@@ -283,13 +352,13 @@ hr {
     margin-bottom: 3px !important;
     transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
-[data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child .stButton > button[kind="secondary"]:hover {
+[data-testid="stColumn"]:has(.sidebar-marker) .stButton > button[kind="secondary"]:hover {
     background: rgba(232, 93, 12, 0.1) !important;
     color: #fff !important;
     border-left: 3px solid #E85D0C !important;
     transform: translateX(3px) !important;
 }
-[data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child .stButton > button[kind="primary"] {
+[data-testid="stColumn"]:has(.sidebar-marker) .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, rgba(232,93,12,0.18) 0%, rgba(232,93,12,0.08) 100%) !important;
     color: #FF8A3D !important;
     border: none !important;
@@ -306,10 +375,123 @@ hr {
     transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
     transform: none !important;
 }
-[data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child .stButton > button[kind="primary"]:hover {
+[data-testid="stColumn"]:has(.sidebar-marker) .stButton > button[kind="primary"]:hover {
     background: linear-gradient(135deg, rgba(232,93,12,0.25) 0%, rgba(232,93,12,0.12) 100%) !important;
     transform: translateX(3px) !important;
     box-shadow: none !important;
+
+
+/* ── Botões Customizados (Add, Confirm, Cancel) Globais ── */
+[data-testid="stElementContainer"]:has(.btn-add) ~ [data-testid="stElementContainer"] button,
+[data-testid="stElementContainer"]:has(.btn-add) button,
+div.element-container:has(.btn-add) ~ div button,
+div.element-container:has(.btn-add) button,
+.btn-add button,
+.btn-add > div > button {
+    background: rgba(43,76,140,0.15) !important;
+    color: #7BA1F2 !important;
+    border: 1px solid rgba(43,76,140,0.4) !important;
+    border-radius: 8px !important;
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    height: 44px !important;
+    transition: all 0.2s !important;
+}
+[data-testid="stElementContainer"]:has(.btn-add) ~ [data-testid="stElementContainer"] button:hover,
+[data-testid="stElementContainer"]:has(.btn-add) button:hover,
+div.element-container:has(.btn-add) ~ div button:hover,
+div.element-container:has(.btn-add) button:hover,
+.btn-add button:hover,
+.btn-add > div > button:hover {
+    background: rgba(43,76,140,0.25) !important;
+    border-color: rgba(43,76,140,0.6) !important;
+    color: #93B2F4 !important;
+}
+
+[data-testid="stElementContainer"]:has(.btn-confirm) ~ [data-testid="stElementContainer"] button,
+[data-testid="stElementContainer"]:has(.btn-confirm) button,
+div.element-container:has(.btn-confirm) ~ div button,
+div.element-container:has(.btn-confirm) button,
+.btn-confirm button,
+.btn-confirm > div > button {
+    background: #E85D04 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    height: 44px !important;
+    transition: all 0.2s !important;
+}
+[data-testid="stElementContainer"]:has(.btn-confirm) ~ [data-testid="stElementContainer"] button:hover,
+[data-testid="stElementContainer"]:has(.btn-confirm) button:hover,
+div.element-container:has(.btn-confirm) ~ div button:hover,
+div.element-container:has(.btn-confirm) button:hover,
+.btn-confirm button:hover,
+.btn-confirm > div > button:hover {
+    background: #FF6B1A !important;
+}
+
+[data-testid="stElementContainer"]:has(.btn-cancel) ~ [data-testid="stElementContainer"] button,
+[data-testid="stElementContainer"]:has(.btn-cancel) button,
+div.element-container:has(.btn-cancel) ~ div button,
+div.element-container:has(.btn-cancel) button,
+.btn-cancel button,
+.btn-cancel > div > button {
+    background: transparent !important;
+    color: #8A7B72 !important;
+    border: 1px solid #332B25 !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    height: 44px !important;
+    transition: all 0.2s !important;
+}
+[data-testid="stElementContainer"]:has(.btn-cancel) ~ [data-testid="stElementContainer"] button:hover,
+[data-testid="stElementContainer"]:has(.btn-cancel) button:hover,
+div.element-container:has(.btn-cancel) ~ div button:hover,
+div.element-container:has(.btn-cancel) button:hover,
+.btn-cancel button:hover,
+.btn-cancel > div > button:hover {
+    background: #1A1715 !important;
+    color: #FFF8F0 !important;
+    border-color: #554A40 !important;
+}
+
+/* ── Estilização de Inputs (Dropdowns, Text, Number Inputs) Globais ── */
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+input[type="text"],
+input[type="number"] {
+    background: #141210 !important;
+    border: 1px solid #332B25 !important;
+    border-radius: 8px !important;
+    color: #FFF8F0 !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 14px !important;
+    height: 48px !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stTextInput"] input:focus,
+[data-testid="stNumberInput"] input:focus {
+    border-color: #E85D04 !important;
+    box-shadow: 0 0 0 3px rgba(232,93,4,0.15) !important;
+}
+[data-testid="stSelectbox"] > div > div {
+    background: #141210 !important;
+    border: 1px solid #332B25 !important;
+    border-radius: 8px !important;
+    color: #FFF8F0 !important;
+    min-height: 48px !important;
+}
+[data-testid="stSelectbox"] > div > div:focus-within {
+    border-color: #E85D04 !important;
+    box-shadow: 0 0 0 3px rgba(232,93,4,0.15) !important;
+}
+[data-testid="stTextInput"] label,
+[data-testid="stNumberInput"] label,
+[data-testid="stSelectbox"] label {
+    display: none !important; /* Esconde nativas */
 }
 
 </style>
@@ -686,6 +868,7 @@ def ir(dest):
 col_menu, col_conteudo = st.columns([1, 4], gap="small")
 
 with col_menu:
+    st.markdown('<div class="sidebar-marker"></div>', unsafe_allow_html=True)
     # Logo + User card (o fundo escuro vem do CSS aplicado na coluna)
     st.markdown(f"""
         <div style="
@@ -776,7 +959,10 @@ with col_conteudo:
             display: none !important; /* Esconde nativas */
         }
         
-        /* Botão Adicionar ao lançamento (Outline/Azulado) */
+
+                /* Botão Adicionar ao lançamento (Outline/Azulado) */
+        div.element-container:has(.btn-add) + div.element-container button,
+        .btn-add button,
         .btn-add > div > button {
             background: rgba(43,76,140,0.15) !important;
             color: #7BA1F2 !important;
@@ -787,6 +973,8 @@ with col_conteudo:
             height: 44px !important;
             transition: all 0.2s !important;
         }
+        div.element-container:has(.btn-add) + div.element-container button:hover,
+        .btn-add button:hover,
         .btn-add > div > button:hover {
             background: rgba(43,76,140,0.25) !important;
             border-color: rgba(43,76,140,0.6) !important;
@@ -794,6 +982,8 @@ with col_conteudo:
         }
         
         /* Botão Confirmar (Laranja) */
+        div.element-container:has(.btn-confirm) + div.element-container button,
+        .btn-confirm button,
         .btn-confirm > div > button {
             background: #E85D04 !important;
             color: #ffffff !important;
@@ -804,11 +994,15 @@ with col_conteudo:
             height: 44px !important;
             transition: all 0.2s !important;
         }
+        div.element-container:has(.btn-confirm) + div.element-container button:hover,
+        .btn-confirm button:hover,
         .btn-confirm > div > button:hover {
             background: #FF6B1A !important;
         }
         
         /* Botão Cancelar (Cinza) */
+        div.element-container:has(.btn-cancel) + div.element-container button,
+        .btn-cancel button,
         .btn-cancel > div > button {
             background: transparent !important;
             color: #8A7B72 !important;
@@ -819,12 +1013,14 @@ with col_conteudo:
             height: 44px !important;
             transition: all 0.2s !important;
         }
+        div.element-container:has(.btn-cancel) + div.element-container button:hover,
+        .btn-cancel button:hover,
         .btn-cancel > div > button:hover {
             background: #1A1715 !important;
             color: #FFF8F0 !important;
             border-color: #554A40 !important;
         }
-        
+
         .stDataFrame {
             border-radius: 12px !important;
             overflow: hidden !important;
@@ -918,6 +1114,22 @@ with col_conteudo:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+            custo_cadastrado = float(pd.to_numeric(info.get("custo_unitario", 0), errors="coerce") or 0.0)
+            if custo_cadastrado > 0:
+                diff_pct = (v_val - custo_cadastrado) / custo_cadastrado
+                if abs(diff_pct) > 0.30:
+                    diff_pct_val = diff_pct * 100
+                    sinal_pct = "+" if diff_pct > 0 else ""
+                    st.markdown(f"""
+                    <div style="padding:12px 18px;background:#3B1E08;border-radius:8px;border:1px solid #7F4C0A;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+                        <span style="font-size:18px;">⚠️</span>
+                        <div>
+                            <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13.0px;color:#D97706;font-weight:700;">Alerta de Custo Divergente</div>
+                            <div style="font-size:12px;color:#F59E0B;margin-top:2px;">O custo unitário informado (R$ {v_val:,.2f}) diverge {sinal_pct}{diff_pct_val:,.1f}% do custo cadastrado (R$ {custo_cadastrado:,.2f}). Por favor, valide os dados antes de adicionar.</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
         else:
             st.markdown("""
             <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;background:#2A200B;border-radius:8px;border:1px solid #4A3510;margin-bottom:20px;">
@@ -1085,64 +1297,152 @@ with col_conteudo:
     ICONES_SAIDA = ["📦", "🗑️", "↩️", "🔄", "📉", "💼"]
     
     def tela_saida():
+        # CSS Customizado Adicional para as Abas e Uploader
         st.markdown("""
         <style>
-        /* ── CSS Saída Dark Theme ── */
-        .block-container { padding-top: 1.5rem !important; }
-        input[type="text"], input[type="number"],
-        .stTextInput > div > div > input, .stNumberInput > div > div > input {
-            background: #141210 !important; border: 1px solid #332B25 !important;
-            border-radius: 8px !important; color: #FFF8F0 !important;
+        /* ── Estilização Premium do File Uploader ── */
+        [data-testid="stFileUploader"] {
+            background-color: #141210 !important;
+            border: 2px dashed #332B25 !important;
+            border-radius: 12px !important;
+            padding: 24px !important;
+            text-align: center !important;
+            transition: all 0.25s ease-in-out !important;
+        }
+        [data-testid="stFileUploader"]:hover {
+            border-color: #EF4444 !important;
+            background-color: #1C1917 !important;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.05) !important;
+        }
+        [data-testid="stFileUploader"] label {
+            display: none !important;
+        }
+        /* Botão interno do Uploader */
+        [data-testid="stFileUploader"] button {
+            background-color: #332B25 !important;
+            color: #FFF8F0 !important;
+            border: 1px solid #4A3E35 !important;
+            border-radius: 8px !important;
+            padding: 8px 16px !important;
+            font-size: 13.5px !important;
+            font-weight: 600 !important;
+            transition: all 0.2s !important;
+            margin-top: 10px !important;
+        }
+        [data-testid="stFileUploader"] button:hover {
+            background-color: #EF4444 !important;
+            border-color: #EF4444 !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25) !important;
+        }
+        
+        /* Ajuste fino nas abas Streamlit */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 16px !important;
+            border-bottom: 1px solid #2A2624 !important;
+            padding-bottom: 8px !important;
+        }
+        .stTabs [data-baseweb="tab"] {
             font-family: 'Plus Jakarta Sans', sans-serif !important;
-            font-size: 14px !important; height: 48px !important; transition: all 0.2s ease !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            color: #8A7B72 !important;
+            padding: 10px 16px !important;
+            border-radius: 8px 8px 0 0 !important;
+            transition: all 0.2s !important;
         }
-        input[type="text"]:focus, input[type="number"]:focus,
-        .stTextInput > div > div > input:focus, .stNumberInput > div > div > input:focus {
-            border-color: #EF4444 !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important;
+        .stTabs [aria-selected="true"] {
+            color: #FFF8F0 !important;
+            background: #2A2220 !important;
+            border-bottom: 2px solid #EF4444 !important;
         }
-        .stSelectbox > div > div {
-            background: #141210 !important; border: 1px solid #332B25 !important;
-            border-radius: 8px !important; color: #FFF8F0 !important; min-height: 48px !important;
+        
+        /* Cards Informativos do SWFast */
+        .flow-step-card {
+            background: #1A1715;
+            border: 1px solid #2A2624;
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
         }
-        .stSelectbox > div > div:focus-within {
-            border-color: #EF4444 !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important;
+        .flow-step-icon {
+            width: 28px;
+            height: 28px;
+            background: #2A1F08;
+            border: 1px solid #4A3510;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #D99F2A;
+            flex-shrink: 0;
+            font-weight: bold;
         }
-        .stTextInput label, .stNumberInput label, .stSelectbox label { display: none !important; }
-        .stRadio > div[role="radiogroup"] {
-            display: grid !important; grid-template-columns: 1fr 1fr 1fr !important; gap: 12px !important;
-        }
-        .stRadio > div[role="radiogroup"] > label {
-            background: #141210 !important; border: 1px solid #2A2624 !important;
-            border-radius: 12px !important; padding: 24px 16px !important; cursor: pointer !important;
-            transition: all 0.2s !important; color: #FFF8F0 !important; text-align: center !important;
-            display: flex !important; flex-direction: column !important;
-            align-items: center !important; justify-content: center !important;
-        }
-        .stRadio > div[role="radiogroup"] > label:hover { border-color: #554A40 !important; background: #1C1917 !important; }
-        .stRadio > div[role="radiogroup"] > label:has(input:checked) {
-            border-color: #EF4444 !important; background: rgba(239,68,68,0.05) !important;
-            box-shadow: 0 0 0 1px #EF4444 !important;
-        }
-        .stRadio > div[role="radiogroup"] > label > div:first-child { display: none !important; }
-        .stRadio div[data-testid="stMarkdownContainer"] > p { font-size: 15px !important; font-weight: 600 !important; margin: 0 !important; }
-        .btn-confirm > div > button {
-            background: #EF4444 !important; color: #ffffff !important; border: none !important;
-            border-radius: 8px !important; font-size: 14px !important; font-weight: 600 !important;
-            height: 44px !important; transition: all 0.2s !important;
-        }
-        .btn-confirm > div > button:hover { background: #DC2626 !important; }
+        
+        /* Botões Customizados */
+        div.element-container:has(.btn-add) + div.element-container button,
+        .btn-add button,
         .btn-add > div > button {
-            background: #1C3020 !important; color: #2ED297 !important; border: 1px solid #2A4A35 !important;
-            border-radius: 8px !important; font-size: 14px !important; font-weight: 600 !important;
-            height: 44px !important; transition: all 0.2s !important;
+            background: rgba(43,76,140,0.15) !important;
+            color: #7BA1F2 !important;
+            border: 1px solid rgba(43,76,140,0.4) !important;
+            border-radius: 8px !important;
+            font-size: 13.5px !important;
+            font-weight: 600 !important;
+            height: 44px !important;
+            transition: all 0.2s !important;
         }
-        .btn-add > div > button:hover { background: #243D2A !important; border-color: #2ED297 !important; }
+        div.element-container:has(.btn-add) + div.element-container button:hover,
+        .btn-add button:hover,
+        .btn-add > div > button:hover {
+            background: rgba(43,76,140,0.25) !important;
+            border-color: rgba(43,76,140,0.6) !important;
+            color: #93B2F4 !important;
+        }
+        
+        /* Botão Confirmar (Laranja) */
+        div.element-container:has(.btn-confirm) + div.element-container button,
+        .btn-confirm button,
+        .btn-confirm > div > button {
+            background: #E85D04 !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            height: 44px !important;
+            transition: all 0.2s !important;
+        }
+        div.element-container:has(.btn-confirm) + div.element-container button:hover,
+        .btn-confirm button:hover,
+        .btn-confirm > div > button:hover {
+            background: #FF6B1A !important;
+        }
+        
+        /* Botão Cancelar (Cinza) */
+        div.element-container:has(.btn-cancel) + div.element-container button,
+        .btn-cancel button,
         .btn-cancel > div > button {
-            background: transparent !important; color: #8A7B72 !important; border: 1px solid #332B25 !important;
-            border-radius: 8px !important; font-size: 14px !important; font-weight: 500 !important;
-            height: 44px !important; transition: all 0.2s !important;
+            background: transparent !important;
+            color: #8A7B72 !important;
+            border: 1px solid #332B25 !important;
+            border-radius: 8px !important;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            height: 44px !important;
+            transition: all 0.2s !important;
         }
-        .btn-cancel > div > button:hover { background: #1A1715 !important; color: #FFF8F0 !important; border-color: #554A40 !important; }
+        div.element-container:has(.btn-cancel) + div.element-container button:hover,
+        .btn-cancel button:hover,
+        .btn-cancel > div > button:hover {
+            background: #1A1715 !important;
+            color: #FFF8F0 !important;
+            border-color: #554A40 !important;
+        }
         </style>
         """, unsafe_allow_html=True)
 
@@ -1207,225 +1507,495 @@ with col_conteudo:
         </div>
         """, unsafe_allow_html=True)
 
-        # ── CARD 1: TIPO DE SAÍDA DO LOTE ───────────────────────────────────
-        st.markdown("""
-        <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
-            <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
-                <div style="width:36px;height:36px;background:#2A200B;border:1px solid #4A3510;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#D99F2A;">🏷️</div>
-                <div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Tipo de saída do lote</div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Classifique o motivo — aplicado a todos os itens do lançamento</div>
+        tab_manual, tab_import, tab_mapping = st.tabs(["📤 Registrar Saída", "📥 Importar SWFast", "⚙️ Mapeamento SWFast"])
+        
+        with tab_manual:
+            # ── CARD 1: TIPO DE SAÍDA DO LOTE ───────────────────────────────────
+            st.markdown("""
+            <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
+                <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
+                    <div style="width:36px;height:36px;background:#2A200B;border:1px solid #4A3510;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#D99F2A;">🏷️</div>
+                    <div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Tipo de saída do lote</div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Classifique o motivo — aplicado a todos os itens do lançamento</div>
+                    </div>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;margin-bottom:24px;">', unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+            st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;margin-bottom:24px;">', unsafe_allow_html=True)
 
-        radio_options = [f"{ICONES_SAIDA[i]} {TIPOS_SAIDA[i]}" for i in range(6)]
-        tipo_said_val = st.radio("Tipo de saída", radio_options, index=0, key=f"sai_tipo_{reset_key}", label_visibility="collapsed")
-        tipo_said = ""
-        for i, opt in enumerate(radio_options):
-            if tipo_said_val == opt:
-                tipo_said = TIPOS_SAIDA[i]; break
+            radio_options = [f"{ICONES_SAIDA[i]} {TIPOS_SAIDA[i]}" for i in range(6)]
+            tipo_said_val = st.radio("Tipo de saída", radio_options, index=0, key=f"sai_tipo_{reset_key}", label_visibility="collapsed")
+            tipo_said = ""
+            for i, opt in enumerate(radio_options):
+                if tipo_said_val == opt:
+                    tipo_said = TIPOS_SAIDA[i]; break
 
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        # ── CARD 2: ADICIONAR ITEM ──────────────────────────────────────────
-        st.markdown("""
-        <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
-            <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
-                <div style="width:36px;height:36px;background:#3B1219;border:1px solid #5A1A22;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#EF4444;">📤</div>
-                <div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Adicionar item ao lançamento</div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Selecione o item e a quantidade — adicione quantos quiser antes de confirmar</div>
+            # ── CARD 2: ADICIONAR ITEM ──────────────────────────────────────────
+            st.markdown("""
+            <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
+                <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
+                    <div style="width:36px;height:36px;background:#3B1219;border:1px solid #5A1A22;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#EF4444;">📤</div>
+                    <div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Adicionar item ao lançamento</div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Selecione o item e a quantidade — adicione quantos quiser antes de confirmar</div>
+                    </div>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;margin-bottom:24px;">', unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+            st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;margin-bottom:24px;">', unsafe_allow_html=True)
 
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;display:flex;align-items:center;gap:6px;">❓ ITEM <span style="color:#EF4444">*</span></div>', unsafe_allow_html=True)
-            item_sel = st.selectbox("Item", list(op_item), index=None, placeholder="Selecione o item...", key=f"sai_item_{reset_key}", label_visibility="collapsed")
-        with c2:
-            st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;display:flex;align-items:center;gap:6px;">🔢 QUANTIDADE <span style="color:#EF4444">*</span></div>', unsafe_allow_html=True)
-            qtd = st.number_input("Quantidade", min_value=0.001, step=1.0, format="%.0f", value=None, placeholder="0", key=f"sai_qtd_{reset_key}", label_visibility="collapsed")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;display:flex;align-items:center;gap:6px;">❓ ITEM <span style="color:#EF4444">*</span></div>', unsafe_allow_html=True)
+                item_sel = st.selectbox("Item", list(op_item), index=None, placeholder="Selecione o item...", key=f"sai_item_{reset_key}", label_visibility="collapsed")
+            with c2:
+                st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;display:flex;align-items:center;gap:6px;">🔢 QUANTIDADE <span style="color:#EF4444">*</span></div>', unsafe_allow_html=True)
+                qtd = st.number_input("Quantidade", min_value=0.001, step=1.0, format="%.0f", value=None, placeholder="0", key=f"sai_qtd_{reset_key}", label_visibility="collapsed")
 
-        st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;margin-top:16px;display:flex;align-items:center;gap:6px;">📝 OBSERVAÇÃO</div>', unsafe_allow_html=True)
-        obs = st.text_input("Observação", placeholder="opcional ➔ detalhe o motivo ou destino", key=f"sai_obs_{reset_key}", label_visibility="collapsed")
+            st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;margin-top:16px;display:flex;align-items:center;gap:6px;">📝 OBSERVAÇÃO</div>', unsafe_allow_html=True)
+            obs = st.text_input("Observação", placeholder="opcional ➔ detalhe o motivo ou destino", key=f"sai_obs_{reset_key}", label_visibility="collapsed")
 
-        st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
+            st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
 
-        sal = 0; mn = 0; novo = 0; composto = False
+            sal = 0; mn = 0; novo = 0; composto = False
 
-        if item_sel:
-            id_item  = op_item[item_sel]
-            info     = itens[itens["id_item"] == id_item].iloc[0]
-            sal      = saldo_item(id_item)
-            mn       = float(info["estoque_minimo"])
-            q_val    = qtd if qtd is not None else 0.0
-            novo     = sal - q_val
-            composto = is_composto(id_item)
-            composicao = composicao_produto(id_item) if composto else []
+            if item_sel:
+                id_item  = op_item[item_sel]
+                info     = itens[itens["id_item"] == id_item].iloc[0]
+                sal      = saldo_item(id_item)
+                mn       = float(info["estoque_minimo"])
+                q_val    = qtd if qtd is not None else 0.0
+                novo     = sal - q_val
+                composto = is_composto(id_item)
+                composicao = composicao_produto(id_item) if composto else []
+
+                st.markdown(f"""
+                <div style="display:flex;align-items:center;gap:14px;padding:12px 18px;background:#0F1D1A;border-radius:8px;border:1px solid #143A2A;">
+                    <span style="font-size:18px;">✔️</span>
+                    <div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:#2ED297;"><strong style="color:#FFF8F0;">Saldo atual:</strong> {sal:.0f} {info['unidade']}</div>
+                        <div style="font-size:11.5px;color:#1D9E75;margin-top:2px;">Saída: -{q_val:.0f} &nbsp;|&nbsp; Novo saldo: {novo:.0f}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if composto:
+                    linhas = "".join([
+                        f"<li style='color:#A8A59E;'><b style='color:#FFF8F0;'>{c['id_ingrediente']}</b> — {c['nome_ingrediente']} × {float(c['quantidade'])*q_val:.0f} {c['unidade']}</li>"
+                        for c in composicao
+                    ])
+                    st.markdown(f"<div style='margin-top:12px;padding:12px 16px;background:#141210;border-radius:8px;border:1px solid #332B25;font-size:13px;'>🧩 <b style='color:#A987D9;'>Produto composto</b> — ingredientes descontados:<ul style='margin:6px 0 0 16px'>{linhas}</ul></div>", unsafe_allow_html=True)
+
+                if sal <= 0: st.error(f"🔴 ZERADO! Saldo: {sal:.0f} {info['unidade']}")
+                elif sal <= mn: st.warning(f"🟡 CRÍTICO. Saldo: {sal:.0f} | mín: {mn:.0f}")
+                if novo < 0: st.error(f"⛔ Quantidade maior que o disponível ({sal:.0f}).")
+            else:
+                st.markdown("""
+                <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;background:#2A200B;border-radius:8px;border:1px solid #4A3510;">
+                    <span style="font-size:16px;">💡</span>
+                    <span style="font-size:13px;color:#D99F2A;">Selecione um item para ver o saldo atual e adicioná-lo ao lançamento.</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
+            col_space, col_add = st.columns([5, 3])
+            with col_add:
+                st.markdown('<div class="btn-add">', unsafe_allow_html=True)
+                if st.button("＋ Adicionar ao lançamento", use_container_width=True, key="btn_add_saida"):
+                    if not item_sel: st.error("Selecione o item.")
+                    elif not tipo_said: st.error("Selecione o tipo de saída.")
+                    elif qtd is None or qtd <= 0: st.error("Quantidade deve ser maior que zero.")
+                    elif novo < 0: st.error(f"Quantidade maior que o disponível ({sal:.0f}).")
+                    else:
+                        id_it = op_item[item_sel]
+                        inf   = itens[itens["id_item"] == id_it].iloc[0]
+                        sal_a = saldo_item(id_it)
+                        st.session_state["carrinho_saida"].append({
+                            "id_item":     id_it,
+                            "nome":        inf["nome"],
+                            "unidade":     inf["unidade"],
+                            "qtd":         qtd,
+                            "saldo_antes": sal_a,
+                            "obs":         obs if obs else "—",
+                            "composto":    is_composto(id_it),
+                        })
+                        st.success(f"✅ **{inf['nome']}** adicionado ao lançamento!")
+                        st.session_state["saida_reset_key"] = reset_key + 1
+                        st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # ── CARD 3: LISTA DO LANÇAMENTO ─────────────────────────────────────
+            n = len(st.session_state["carrinho_saida"])
+
+            st.markdown("""
+            <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
+                <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
+                    <div style="width:36px;height:36px;background:#141210;border:1px solid #2A2624;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#EF4444;">📋</div>
+                    <div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Itens do lançamento</div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Itens adicionados para baixa em lote</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;">', unsafe_allow_html=True)
+
+            if n == 0:
+                st.markdown("""
+                <div style="text-align:center;padding:30px 0;">
+                    <div style="font-size:13px;color:#554A40;">Nenhum item adicionado ao lançamento.</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                df_cart = pd.DataFrame(st.session_state["carrinho_saida"])
+                df_disp = df_cart[["nome", "qtd", "saldo_antes", "obs"]].copy()
+                df_disp["novo_saldo"] = df_disp["saldo_antes"] - df_disp["qtd"]
+                df_disp.rename(columns={
+                    "nome": "📦 Item", "qtd": "🔢 Qtd",
+                    "saldo_antes": "📊 Saldo Antes", "novo_saldo": "➡️ Novo Saldo", "obs": "💬 Obs.",
+                }, inplace=True)
+                st.dataframe(df_disp, use_container_width=True, hide_index=True, height=min(100 + n * 48, 380))
+
+                st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+                col_a, col_b, _ = st.columns([2, 2, 6])
+                with col_a:
+                    st.markdown('<div class="btn-cancel">', unsafe_allow_html=True)
+                    if st.button("🗑️ Remover último", use_container_width=True, key="saida_rem_ultimo"):
+                        st.session_state["carrinho_saida"].pop(); st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+                with col_b:
+                    st.markdown('<div class="btn-cancel">', unsafe_allow_html=True)
+                    if st.button("✕ Limpar tudo", use_container_width=True, key="saida_limpar"):
+                        st.session_state["carrinho_saida"] = []; st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # ── FOOTER + CONFIRMAR ───────────────────────────────────────────────
+            indicador_texto = f"{n} item(ns) no lançamento" if n > 0 else "Nenhum item adicionado"
+            indicador_cor   = "#EF4444" if n > 0 else "#554A40"
+
+            if st.session_state.get("msg_saida"):
+                msg = st.session_state.pop("msg_saida")
+                st.success(msg)
 
             st.markdown(f"""
-            <div style="display:flex;align-items:center;gap:14px;padding:12px 18px;background:#0F1D1A;border-radius:8px;border:1px solid #143A2A;">
-                <span style="font-size:18px;">✔️</span>
-                <div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:#2ED297;"><strong style="color:#FFF8F0;">Saldo atual:</strong> {sal:.0f} {info['unidade']}</div>
-                    <div style="font-size:11.5px;color:#1D9E75;margin-top:2px;">Saída: -{q_val:.0f} &nbsp;|&nbsp; Novo saldo: {novo:.0f}</div>
+            <div style="margin-top:30px; border-top:1px solid #332B25; padding-top:20px; display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:8px;height:8px;background:{indicador_cor};border-radius:50%; box-shadow: 0 0 6px {indicador_cor}88;"></div>
+                    <span style="font-size:12.5px;color:#8A7B72;">{indicador_texto} · tipo: <b style="color:#FFF8F0;">{tipo_said}</b></span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            if composto:
-                linhas = "".join([
-                    f"<li style='color:#A8A59E;'><b style='color:#FFF8F0;'>{c['id_ingrediente']}</b> — {c['nome_ingrediente']} × {float(c['quantidade'])*q_val:.0f} {c['unidade']}</li>"
-                    for c in composicao
-                ])
-                st.markdown(f"<div style='margin-top:12px;padding:12px 16px;background:#141210;border-radius:8px;border:1px solid #332B25;font-size:13px;'>🧩 <b style='color:#A987D9;'>Produto composto</b> — ingredientes descontados:<ul style='margin:6px 0 0 16px'>{linhas}</ul></div>", unsafe_allow_html=True)
-
-            if sal <= 0: st.error(f"🔴 ZERADO! Saldo: {sal:.0f} {info['unidade']}")
-            elif sal <= mn: st.warning(f"🟡 CRÍTICO. Saldo: {sal:.0f} | mín: {mn:.0f}")
-            if novo < 0: st.error(f"⛔ Quantidade maior que o disponível ({sal:.0f}).")
-        else:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;background:#2A200B;border-radius:8px;border:1px solid #4A3510;">
-                <span style="font-size:16px;">💡</span>
-                <span style="font-size:13px;color:#D99F2A;">Selecione um item para ver o saldo atual e adicioná-lo ao lançamento.</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
-        col_space, col_add = st.columns([5, 3])
-        with col_add:
-            st.markdown('<div class="btn-add">', unsafe_allow_html=True)
-            if st.button("＋ Adicionar ao lançamento", use_container_width=True, key="btn_add_saida"):
-                if not item_sel: st.error("Selecione o item.")
-                elif not tipo_said: st.error("Selecione o tipo de saída.")
-                elif qtd is None or qtd <= 0: st.error("Quantidade deve ser maior que zero.")
-                elif novo < 0: st.error(f"Quantidade maior que o disponível ({sal:.0f}).")
-                else:
-                    id_it = op_item[item_sel]
-                    inf   = itens[itens["id_item"] == id_it].iloc[0]
-                    sal_a = saldo_item(id_it)
-                    st.session_state["carrinho_saida"].append({
-                        "id_item":     id_it,
-                        "nome":        inf["nome"],
-                        "unidade":     inf["unidade"],
-                        "qtd":         qtd,
-                        "saldo_antes": sal_a,
-                        "obs":         obs if obs else "—",
-                        "composto":    is_composto(id_it),
-                    })
-                    st.success(f"✅ **{inf['nome']}** adicionado ao lançamento!")
-                    st.session_state["saida_reset_key"] = reset_key + 1
-                    st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # ── CARD 3: LISTA DO LANÇAMENTO ─────────────────────────────────────
-        n = len(st.session_state["carrinho_saida"])
-
-        st.markdown("""
-        <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
-            <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
-                <div style="width:36px;height:36px;background:#141210;border:1px solid #2A2624;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#EF4444;">📋</div>
-                <div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Itens do lançamento</div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Itens adicionados para baixa em lote</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;">', unsafe_allow_html=True)
-
-        if n == 0:
-            st.markdown("""
-            <div style="text-align:center;padding:30px 0;">
-                <div style="font-size:13px;color:#554A40;">Nenhum item adicionado ao lançamento.</div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            df_cart = pd.DataFrame(st.session_state["carrinho_saida"])
-            df_disp = df_cart[["nome", "qtd", "saldo_antes", "obs"]].copy()
-            df_disp["novo_saldo"] = df_disp["saldo_antes"] - df_disp["qtd"]
-            df_disp.rename(columns={
-                "nome": "📦 Item", "qtd": "🔢 Qtd",
-                "saldo_antes": "📊 Saldo Antes", "novo_saldo": "➡️ Novo Saldo", "obs": "💬 Obs.",
-            }, inplace=True)
-            st.dataframe(df_disp, use_container_width=True, hide_index=True, height=min(100 + n * 48, 380))
-
-            st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-            col_a, col_b, _ = st.columns([2, 2, 6])
-            with col_a:
+            st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+            col_space2, col_cancel, col_confirm = st.columns([5, 2, 3])
+            with col_cancel:
                 st.markdown('<div class="btn-cancel">', unsafe_allow_html=True)
-                if st.button("🗑️ Remover último", use_container_width=True, key="saida_rem_ultimo"):
-                    st.session_state["carrinho_saida"].pop(); st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-            with col_b:
-                st.markdown('<div class="btn-cancel">', unsafe_allow_html=True)
-                if st.button("✕ Limpar tudo", use_container_width=True, key="saida_limpar"):
-                    st.session_state["carrinho_saida"] = []; st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # ── FOOTER + CONFIRMAR ───────────────────────────────────────────────
-        indicador_texto = f"{n} item(ns) no lançamento" if n > 0 else "Nenhum item adicionado"
-        indicador_cor   = "#EF4444" if n > 0 else "#554A40"
-
-        if st.session_state.get("msg_saida"):
-            msg = st.session_state.pop("msg_saida")
-            st.success(msg)
-
-        st.markdown(f"""
-        <div style="margin-top:30px; border-top:1px solid #332B25; padding-top:20px; display:flex; align-items:center; justify-content:space-between;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:8px;height:8px;background:{indicador_cor};border-radius:50%; box-shadow: 0 0 6px {indicador_cor}88;"></div>
-                <span style="font-size:12.5px;color:#8A7B72;">{indicador_texto} · tipo: <b style="color:#FFF8F0;">{tipo_said}</b></span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
-        col_space2, col_cancel, col_confirm = st.columns([5, 2, 3])
-        with col_cancel:
-            st.markdown('<div class="btn-cancel">', unsafe_allow_html=True)
-            if st.button("🗑️ Cancelar", use_container_width=True, key="saida_cancelar"):
-                st.session_state["carrinho_saida"] = []
-                st.session_state["saida_reset_key"] = reset_key + 1
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-        with col_confirm:
-            st.markdown('<div class="btn-confirm">', unsafe_allow_html=True)
-            if st.button("✓ Confirmar baixa em lote", use_container_width=True, key="saida_confirmar"):
-                if n == 0:
-                    st.error("Adicione itens ao lançamento antes de confirmar.")
-                elif not tipo_said:
-                    st.error("Selecione o tipo de saída.")
-                else:
-                    erros = []; ok = 0
-                    for item in st.session_state["carrinho_saida"]:
-                        try:
-                            if item["composto"]:
-                                registrar_saida_composta(item["id_item"], item["qtd"], u["usuario"], motivo=tipo_said, obs=item["obs"])
-                            else:
-                                registrar_movimento("SAÍDA", item["id_item"], item["qtd"], u["usuario"], motivo=tipo_said, obs=item["obs"])
-                            ok += 1
-                        except Exception as e:
-                            erros.append(f"{item['nome']}: {e}")
-                    if erros:
-                        st.session_state["msg_saida"] = f"⚠️ {ok} registrado(s). Erros: {'; '.join(erros)}"
-                    else:
-                        st.session_state["msg_saida"] = f"🎉 **Baixa confirmada!** {ok} item(s) baixado(s). Tipo: {tipo_said}"
+                if st.button("🗑️ Cancelar", use_container_width=True, key="saida_cancelar"):
                     st.session_state["carrinho_saida"] = []
                     st.session_state["saida_reset_key"] = reset_key + 1
                     st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+            with col_confirm:
+                st.markdown('<div class="btn-confirm">', unsafe_allow_html=True)
+                if st.button("✓ Confirmar baixa em lote", use_container_width=True, key="saida_confirmar"):
+                    if n == 0:
+                        st.error("Adicione itens ao lançamento antes de confirmar.")
+                    elif not tipo_said:
+                        st.error("Selecione o tipo de saída.")
+                    else:
+                        erros = []; ok = 0
+                        for item in st.session_state["carrinho_saida"]:
+                            try:
+                                if item["composto"]:
+                                    registrar_saida_composta(item["id_item"], item["qtd"], u["usuario"], motivo=tipo_said, obs=item["obs"])
+                                else:
+                                    registrar_movimento("SAÍDA", item["id_item"], item["qtd"], u["usuario"], motivo=tipo_said, obs=item["obs"])
+                                ok += 1
+                            except Exception as e:
+                                erros.append(f"{item['nome']}: {e}")
+                        if erros:
+                            st.session_state["msg_saida"] = f"⚠️ {ok} registrado(s). Erros: {'; '.join(erros)}"
+                        else:
+                            st.session_state["msg_saida"] = f"🎉 **Baixa confirmada!** {ok} item(s) baixado(s). Tipo: {tipo_said}"
+                        st.session_state["carrinho_saida"] = []
+                        st.session_state["saida_reset_key"] = reset_key + 1
+                        st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        with tab_import:
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Workflow / Guia Rápido
+            col_g1, col_g2, col_g3 = st.columns(3)
+            with col_g1:
+                st.markdown("""
+                <div class="flow-step-card">
+                    <div class="flow-step-icon">1</div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#8A7B72;letter-spacing:0.05em;text-transform:uppercase;">VÍNCULOS</div>
+                        <div style="font-size:12.5px;color:#FFF8F0;margin-top:2px;font-weight:600;">Mapear códigos</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col_g2:
+                st.markdown("""
+                <div class="flow-step-card">
+                    <div class="flow-step-icon">2</div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#8A7B72;letter-spacing:0.05em;text-transform:uppercase;">SWFAST</div>
+                        <div style="font-size:12.5px;color:#FFF8F0;margin-top:2px;font-weight:600;">Exportar PDF/Excel</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col_g3:
+                st.markdown("""
+                <div class="flow-step-card">
+                    <div class="flow-step-icon">3</div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#8A7B72;letter-spacing:0.05em;text-transform:uppercase;">ERP</div>
+                        <div style="font-size:12.5px;color:#FFF8F0;margin-top:2px;font-weight:600;">Upload e Baixa</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
+                <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
+                    <div style="width:36px;height:36px;background:#142240;border:1px solid #2A3A60;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#7BA1F2;">📥</div>
+                    <div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Importar relatório diário</div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Formatos suportados: PDF e Planilhas Excel (.xlsx, .xls) do SWFast</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;margin-bottom:24px;">', unsafe_allow_html=True)
+            
+            st.markdown('<div translate="no">', unsafe_allow_html=True)
+            arq_upload = st.file_uploader("Selecione o arquivo do SWFast", type=["pdf", "xlsx", "xls"], key="swfast_uploader", label_visibility="collapsed")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            if arq_upload is not None:
+                from utils.swfast_parser import parse_swfast_file
+                
+                try:
+                    arq_upload.seek(0)
+                    items_parsed = parse_swfast_file(arq_upload, arq_upload.name)
+                    
+                    if not items_parsed:
+                        st.warning("⚠️ Nenhum item de consumo foi encontrado no relatório enviado.")
+                    else:
+                        st.markdown(f"""
+                        <div style='display:flex;align-items:center;gap:12px;padding:12px 18px;background:#0F1D1A;border-radius:8px;border:1px solid #143A2A;margin-bottom:20px;'>
+                            <span style='font-size:16px;'>✅</span>
+                            <span style='color:#2ED297;font-size:13px;font-weight:600;'>Leitura concluída! Encontrados <b>{len(items_parsed)}</b> itens no arquivo.</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        df_maps = listar_mapeamentos()
+                        if df_maps.empty:
+                            st.error("⚠️ Nenhum mapeamento cadastrado no banco. Vincule os códigos na aba 'Mapeamento SWFast' antes de processar.")
+                        else:
+                            mapped_rows = []
+                            unmapped_rows = []
+                            
+                            map_dict = {str(row["codigo_swfast"]): row["id_item"] for _, row in df_maps.iterrows()}
+                            itens_df = listar_itens()
+                            itens_dict = {row["id_item"]: row for _, row in itens_df.iterrows()}
+                            
+                            for item in items_parsed:
+                                code = str(item["codigo_swfast"])
+                                desc = item["nome_swfast"]
+                                qty = item["quantidade"]
+                                
+                                if code in map_dict:
+                                    id_item = map_dict[code]
+                                    item_info = itens_dict.get(id_item, None)
+                                    if item_info is not None:
+                                        saldo_at = saldo_item(id_item)
+                                        novo_sal = saldo_at - qty
+                                        mapped_rows.append({
+                                            "Código SWFast": code,
+                                            "Item SWFast": desc,
+                                            "Código ERP": id_item,
+                                            "Produto ERP": item_info["nome"],
+                                            "Quantidade": qty,
+                                            "Unidade": item_info["unidade"],
+                                            "Saldo Atual": saldo_at,
+                                            "Novo Saldo": novo_sal
+                                        })
+                                    else:
+                                        unmapped_rows.append({
+                                            "Código SWFast": code,
+                                            "Item SWFast": desc,
+                                            "Quantidade": qty,
+                                            "Motivo": f"Item {id_item} não existe no ERP"
+                                        })
+                                else:
+                                    unmapped_rows.append({
+                                        "Código SWFast": code,
+                                        "Item SWFast": desc,
+                                        "Quantidade": qty,
+                                        "Motivo": "Não mapeado"
+                                    })
+                            
+                            # Exibe tabela de baixas
+                            if mapped_rows:
+                                st.markdown("<h5 style='color:#FFF8F0;font-family:\'Plus Jakarta Sans\',sans-serif;margin-top:10px;margin-bottom:10px;'>📋 Pré-visualização da Baixa</h5>", unsafe_allow_html=True)
+                                df_mapped = pd.DataFrame(mapped_rows)
+                                df_disp = df_mapped[["Código SWFast", "Item SWFast", "Código ERP", "Produto ERP", "Quantidade", "Unidade", "Saldo Atual", "Novo Saldo"]].copy()
+                                
+                                st.dataframe(
+                                    df_disp,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    height=min(100 + len(mapped_rows) * 38, 380)
+                                )
+                                
+                                neg_count = sum(1 for r in mapped_rows if r["Novo Saldo"] < 0)
+                                if neg_count > 0:
+                                    st.warning(f"⚠️ Atenção: {neg_count} item(ns) ficarão com saldo de estoque negativo após a confirmação.")
+                                    
+                                st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+                                col_btn1, col_btn2 = st.columns([7, 3])
+                                with col_btn2:
+                                    st.markdown('<div class="btn-confirm">', unsafe_allow_html=True)
+                                    if st.button("✓ Confirmar Baixa em Lote", use_container_width=True, key="btn_confirm_lote"):
+                                        lote = [{"id_item": r["Código ERP"], "quantidade": r["Quantidade"]} for r in mapped_rows]
+                                        try:
+                                            registrar_saida_em_lote(lote, u["usuario"], motivo="Importação SWFast", obs=f"Importação de {arq_upload.name}")
+                                            st.success(f"🎉 **Baixa realizada!** {len(mapped_rows)} itens processados no estoque.")
+                                            import time
+                                            time.sleep(1.5)
+                                            st.rerun()
+                                        except Exception as err:
+                                            st.error(f"Erro ao processar lote: {err}")
+                                    st.markdown('</div>', unsafe_allow_html=True)
+                            else:
+                                st.warning("Nenhum item do arquivo pôde ser mapeado para o ERP.")
+                                
+                            # Exibe itens não mapeados
+                            if unmapped_rows:
+                                st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+                                with st.expander(f"⚠️ Itens não mapeados / ignorados ({len(unmapped_rows)})"):
+                                    df_unmapped = pd.DataFrame(unmapped_rows)
+                                    st.dataframe(
+                                        df_unmapped[["Código SWFast", "Item SWFast", "Quantidade", "Motivo"]],
+                                        use_container_width=True,
+                                        hide_index=True,
+                                        height=min(100 + len(unmapped_rows) * 38, 250)
+                                    )
+                                    st.caption("Dica: Cadastre os códigos acima na aba 'Mapeamento SWFast' para que entrem nas próximas baixas.")
+                                    
+                except Exception as ex:
+                    st.error(f"Erro ao processar arquivo: {ex}")
             st.markdown('</div>', unsafe_allow_html=True)
 
+        with tab_mapping:
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Formulário para cadastrar mapeamento
+            st.markdown("""
+            <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
+                <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
+                    <div style="width:36px;height:36px;background:#2A1F08;border:1px solid #4A3510;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#D99F2A;">➕</div>
+                    <div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Adicionar novo vínculo</div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Associe chaves do SWFast a itens do ERP</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;margin-bottom:24px;">', unsafe_allow_html=True)
+            
+            with st.form("form_novo_mapeamento", clear_on_submit=True):
+                col_c1, col_c2, col_c3 = st.columns([2, 4, 4])
+                with col_c1:
+                    cod_sw = st.text_input("Código no SWFast", placeholder="Ex: 50908")
+                with col_c2:
+                    nom_sw = st.text_input("Nome/Descrição no SWFast", placeholder="Ex: INS COCA COLA LATA")
+                with col_c3:
+                    itens_list = listar_itens()
+                    op_itens_map = {f"{r['id_item']} — {r['nome']} ({r['unidade']})": r['id_item'] for _, r in itens_list.iterrows()}
+                    item_erp = st.selectbox("Item Correspondente no ERP", list(op_itens_map), index=None, placeholder="Selecione o item...")
+                
+                submitted = st.form_submit_button("✓ Salvar Vínculo")
+                if submitted:
+                    if not cod_sw or not nom_sw or not item_erp:
+                        st.error("Preencha todos os campos para salvar.")
+                    else:
+                        from utils.data import salvar_mapeamento
+                        salvar_mapeamento(cod_sw.strip(), nom_sw.strip(), op_itens_map[item_erp])
+                        st.success(f"Mapeamento salvo: {cod_sw} ➡️ {op_itens_map[item_erp]}")
+                        import time
+                        time.sleep(1)
+                        st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Lista mapeamentos atuais com filtro de busca
+            st.markdown("""
+            <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
+                <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
+                    <div style="width:36px;height:36px;background:#1A1715;border:1px solid #2A2624;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#8A7B72;">📋</div>
+                    <div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Mapeamentos Cadastrados</div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Consulte ou remova vínculos existentes</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;">', unsafe_allow_html=True)
+            
+            busca_map = st.text_input("🔍 Buscar mapeamento...", placeholder="Digite código, nome SWFast ou item do ERP...", key="busca_map_input")
+            
+            from utils.data import listar_mapeamentos
+            df_maps = listar_mapeamentos()
+            if df_maps.empty:
+                st.info("Nenhum mapeamento cadastrado.")
+            else:
+                itens_df = listar_itens()[["id_item", "nome", "unidade"]]
+                df_maps_merged = df_maps.merge(itens_df, on="id_item", how="left").fillna("")
+                
+                # Filtragem da busca
+                if busca_map:
+                    b_low = busca_map.lower()
+                    df_maps_merged = df_maps_merged[
+                        df_maps_merged["codigo_swfast"].astype(str).str.lower().str.contains(b_low) |
+                        df_maps_merged["nome_swfast"].str.lower().str.contains(b_low) |
+                        df_maps_merged["id_item"].str.lower().str.contains(b_low) |
+                        df_maps_merged["nome"].str.lower().str.contains(b_low)
+                    ]
+                
+                if df_maps_merged.empty:
+                    st.warning("Nenhum mapeamento encontrado para esta busca.")
+                else:
+                    st.markdown("<div style='max-height: 400px; overflow-y: auto; padding-right: 8px;'>", unsafe_allow_html=True)
+                    for idx, r in df_maps_merged.iterrows():
+                        col_m1, col_m2, col_m3, col_m4 = st.columns([1.5, 3.5, 4, 1])
+                        with col_m1:
+                            st.code(r["codigo_swfast"])
+                        with col_m2:
+                            st.markdown(f"<span style='color:#FFF8F0;font-size:13px;'>{r['nome_swfast']}</span>", unsafe_allow_html=True)
+                        with col_m3:
+                            st.markdown(f"<span style='color:#8A7B72;font-size:13px;'>➡️ <b>{r['id_item']}</b> — {r['nome']} ({r['unidade']})</span>", unsafe_allow_html=True)
+                        with col_m4:
+                            if st.button("🗑️", key=f"del_map_{r['codigo_swfast']}", use_container_width=True):
+                                from utils.data import remover_mapeamento
+                                remover_mapeamento(r["codigo_swfast"])
+                                st.toast(f"Removido mapeamento {r['codigo_swfast']}", icon="🗑️")
+                                st.rerun()
+                        st.markdown("<div style='height:8px;border-bottom:1px solid #2D2624;margin-bottom:8px;'></div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
     # ── AJUSTE ───────────────────────────────────────────
     MOTIVOS_AJUSTE  = ["Inventário", "Divergência", "Erro de sistema", "Avaria", "Recontagem", "Outro"]
     ICONES_AJUSTE   = ["📋", "⚠️", "💻", "📦", "🔄", "🟠"]
@@ -1509,6 +2079,8 @@ with col_conteudo:
         }
 
         /* Botões */
+        div.element-container:has(.btn-confirm-ajuste) + div.element-container button,
+        .btn-confirm-ajuste button,
         .btn-confirm-ajuste > div > button {
             background: #D99F2A !important;
             color: #1A1208 !important;
@@ -1519,9 +2091,13 @@ with col_conteudo:
             height: 44px !important;
             transition: all 0.2s !important;
         }
+        div.element-container:has(.btn-confirm-ajuste) + div.element-container button:hover,
+        .btn-confirm-ajuste button:hover,
         .btn-confirm-ajuste > div > button:hover {
             background: #F0B830 !important;
         }
+        div.element-container:has(.btn-cancel) + div.element-container button,
+        .btn-cancel button,
         .btn-cancel > div > button {
             background: transparent !important;
             color: #8A7B72 !important;
@@ -1532,6 +2108,8 @@ with col_conteudo:
             height: 44px !important;
             transition: all 0.2s !important;
         }
+        div.element-container:has(.btn-cancel) + div.element-container button:hover,
+        .btn-cancel button:hover,
         .btn-cancel > div > button:hover {
             background: #1A1715 !important;
             color: #FFF8F0 !important;
@@ -1551,16 +2129,35 @@ with col_conteudo:
         </div>
         """, unsafe_allow_html=True)
 
-        # ── KPIs MOCK ───────────────────────────────────────────────────
+        # Fetch movements once for KPIs
+        df_movs = listar_movimentos()
+        ajustes_hoje = 0
+        com_divergencia = 0
+        ultimo_ajuste_str = "Nenhum"
+
+        if not df_movs.empty:
+            df_ajustes = df_movs[df_movs['tipo'].str.contains('AJUSTE', na=False)]
+            if not df_ajustes.empty:
+                try:
+                    from datetime import date
+                    ajustes_hoje = len(df_ajustes[df_ajustes['timestamp'].dt.date == date.today()])
+                except Exception:
+                    pass
+                com_divergencia = len(df_ajustes)
+                try:
+                    ultimo_ajuste_str = df_ajustes['timestamp'].max().strftime('%d/%m')
+                except Exception:
+                    pass
+
         st.markdown(f"""
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:24px;">
             <div style="background:#1A1715;border:1px solid #2A2624;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
                 <div style="width:36px;height:36px;background:#2A1F08;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid #4A3510;">🔧</div>
-                <div><div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Ajustes Hoje</div><div style="font-size:16px;color:#FFF8F0;font-weight:700;margin-top:2px;">{len(listar_movimentos()[listar_movimentos()['timestamp'].dt.date == date.today()][listar_movimentos()['tipo'].str.contains('AJUSTE')]) if not listar_movimentos().empty else 0}</div></div>
+                <div><div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Ajustes Hoje</div><div style="font-size:16px;color:#FFF8F0;font-weight:700;margin-top:2px;">{ajustes_hoje}</div></div>
             </div>
             <div style="background:#1A1715;border:1px solid #2A2624;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
                 <div style="width:36px;height:36px;background:#3B1219;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid #5A1A22;">📨</div>
-                <div><div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Com Divergência</div><div style="font-size:16px;color:#FFF8F0;font-weight:700;margin-top:2px;">{len(listar_movimentos()[listar_movimentos()['tipo'].str.contains('AJUSTE')]) if not listar_movimentos().empty else 0}</div></div>
+                <div><div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Com Divergência</div><div style="font-size:16px;color:#FFF8F0;font-weight:700;margin-top:2px;">{com_divergencia}</div></div>
             </div>
             <div style="background:#1A1715;border:1px solid #2A2624;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
                 <div style="width:36px;height:36px;background:#0F2430;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid #1A3A50;">🎯</div>
@@ -1568,7 +2165,7 @@ with col_conteudo:
             </div>
             <div style="background:#1A1715;border:1px solid #2A2624;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
                 <div style="width:36px;height:36px;background:#0F2A1B;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid #164028;">✅</div>
-                <div><div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Último Ajuste</div><div style="font-size:16px;color:#FFF8F0;font-weight:700;margin-top:2px;">{listar_movimentos()[listar_movimentos()['tipo'].str.contains('AJUSTE')]['timestamp'].max().strftime('%d/%m') if not listar_movimentos().empty and not listar_movimentos()[listar_movimentos()['tipo'].str.contains('AJUSTE')].empty else 'Nenhum'}</div></div>
+                <div><div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Último Ajuste</div><div style="font-size:16px;color:#FFF8F0;font-weight:700;margin-top:2px;">{ultimo_ajuste_str}</div></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1578,135 +2175,279 @@ with col_conteudo:
         op_item = {f"{r['id_item']} — {r['nome']}":r['id_item'] for _,r in itens.iterrows()}
         reset_key = st.session_state.get("ajuste_reset_key", 0)
 
-        # ── CARD 1: DADOS DO AJUSTE ──────────────────────────────────────
-        st.markdown("""
-        <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
-            <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
-                <div style="width:36px;height:36px;background:#2A1F08;border:1px solid #4A3510;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#D99F2A;">🔧</div>
-                <div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Dados do ajuste</div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Informe o item e a quantidade física contada no estoque</div>
+        tab_manual, tab_import = st.tabs(["🔧 Ajuste Manual", "📥 Importar PDF de Inventário"])
+        
+        with tab_manual:
+            # ── CARD 1: DADOS DO AJUSTE ──────────────────────────────────────
+            st.markdown("""
+            <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
+                <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
+                    <div style="width:36px;height:36px;background:#2A1F08;border:1px solid #4A3510;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#D99F2A;">🔧</div>
+                    <div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Dados do ajuste</div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Informe o item e a quantidade física contada no estoque</div>
+                    </div>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;margin-bottom:24px;">', unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+            st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;margin-bottom:24px;">', unsafe_allow_html=True)
 
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;display:flex;align-items:center;gap:6px;">📦 ITEM <span style="color:#D99F2A">*</span></div>', unsafe_allow_html=True)
-            item_sel = st.selectbox("Item", list(op_item), index=None, placeholder="Selecione o item...", key=f"ajt_item_{reset_key}", label_visibility="collapsed")
-        with c2:
-            st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;display:flex;align-items:center;gap:6px;">📋 QUANTIDADE CONTADA <span style="color:#D99F2A">*</span></div>', unsafe_allow_html=True)
-            qtd_fis = st.number_input("Quantidade contada", min_value=0.0, step=1.0, format="%.0f", value=None, placeholder="Digite a contagem física...", key=f"ajt_qtd_{reset_key}", label_visibility="collapsed")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;display:flex;align-items:center;gap:6px;">📦 ITEM <span style="color:#D99F2A">*</span></div>', unsafe_allow_html=True)
+                item_sel = st.selectbox("Item", list(op_item), index=None, placeholder="Selecione o item...", key=f"ajt_item_{reset_key}", label_visibility="collapsed")
+            with c2:
+                st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;display:flex;align-items:center;gap:6px;">📋 QUANTIDADE CONTADA <span style="color:#D99F2A">*</span></div>', unsafe_allow_html=True)
+                qtd_fis = st.number_input("Quantidade contada", min_value=0.0, step=1.0, format="%.0f", value=None, placeholder="Digite a contagem física...", key=f"ajt_qtd_{reset_key}", label_visibility="collapsed")
 
-        st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;margin-top:16px;display:flex;align-items:center;gap:6px;">💬 OBSERVAÇÃO</div>', unsafe_allow_html=True)
-        obs = st.text_input("Observação", placeholder="opcional — descreva o contexto do ajuste", key=f"ajt_obs_{reset_key}", label_visibility="collapsed")
+            st.markdown('<div style="font-size:10px;font-weight:700;color:#8A7B72;letter-spacing:0.06em;margin-bottom:6px;margin-top:16px;display:flex;align-items:center;gap:6px;">💬 OBSERVAÇÃO</div>', unsafe_allow_html=True)
+            obs = st.text_input("Observação", placeholder="opcional — descreva o contexto do ajuste", key=f"ajt_obs_{reset_key}", label_visibility="collapsed")
 
-        st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
+            st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
 
-        # Inicializar variáveis
-        sal = 0; diff = 0; tipo_mov = None
+            # Inicializar variáveis
+            sal = 0; diff = 0; tipo_mov = None
 
-        if item_sel:
-            id_item = op_item[item_sel]
-            info    = itens[itens["id_item"]==id_item].iloc[0]
-            sal     = saldo_item(id_item)
-            diff    = (qtd_fis - sal) if qtd_fis is not None else 0.0
-            tipo_mov = "AJUSTE_POS" if diff > 0 else ("AJUSTE_NEG" if diff < 0 else None)
+            if item_sel:
+                id_item = op_item[item_sel]
+                info    = itens[itens["id_item"]==id_item].iloc[0]
+                sal     = saldo_item(id_item)
+                diff    = (qtd_fis - sal) if qtd_fis is not None else 0.0
+                tipo_mov = "AJUSTE_POS" if diff > 0 else ("AJUSTE_NEG" if diff < 0 else None)
 
-            cor_diff = "#2ED297" if diff >= 0 else "#EF4444"
-            sinal = "+" if diff > 0 else ""
-            label_diff = f"{sinal}{diff:.0f}" if qtd_fis is not None else "—"
+                cor_diff = "#2ED297" if diff >= 0 else "#EF4444"
+                sinal = "+" if diff > 0 else ""
+                label_diff = f"{sinal}{diff:.0f}" if qtd_fis is not None else "—"
+
+                st.markdown(f"""
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+                    <div style="background:#141210;border:1px solid #2A2624;border-radius:10px;padding:14px;text-align:center;">
+                        <div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">No sistema</div>
+                        <div style="font-size:22px;font-weight:700;color:#FFF8F0;">{sal:.0f} <span style="font-size:12px;font-weight:400;color:#8A7B72;">{info['unidade']}</span></div>
+                    </div>
+                    <div style="background:#141210;border:1px solid #2A2624;border-radius:10px;padding:14px;text-align:center;">
+                        <div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">Contado</div>
+                        <div style="font-size:22px;font-weight:700;color:#FFF8F0;">{f"{qtd_fis:.0f}" if qtd_fis is not None else "—"} <span style="font-size:12px;font-weight:400;color:#8A7B72;">{info['unidade']}</span></div>
+                    </div>
+                    <div style="background:#141210;border:1.5px solid {cor_diff}33;border-radius:10px;padding:14px;text-align:center;">
+                        <div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">Diferença</div>
+                        <div style="font-size:22px;font-weight:700;color:{cor_diff};">{label_diff}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;background:#2A200B;border-radius:8px;border:1px solid #4A3510;margin-bottom:16px;">
+                    <span style="font-size:16px;">💡</span>
+                    <span style="font-size:13px;color:#D99F2A;">Selecione um item para ver o saldo do sistema e realizar o lançamento.</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # ── CARD 2: MOTIVO DO AJUSTE ──────────────────────────────────────
+            st.markdown("""
+            <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
+                <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
+                    <div style="width:36px;height:36px;background:#2A1F08;border:1px solid #4A3510;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#D99F2A;">🏷️</div>
+                    <div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Motivo do ajuste</div>
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Classifique o motivo para rastreabilidade e auditoria</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;">', unsafe_allow_html=True)
+
+            radio_ajuste = [f"{ICONES_AJUSTE[i]}\n{MOTIVOS_AJUSTE[i]}\n{SUBTIT_AJUSTE[i]}" for i in range(6)]
+            motivo_val = st.radio("Motivo do ajuste", 
+                [f"{ICONES_AJUSTE[i]} {MOTIVOS_AJUSTE[i]}" for i in range(6)], 
+                index=0, key=f"ajt_motivo_{reset_key}", label_visibility="collapsed")
+
+            motivo = ""
+            for i, tipo in enumerate(MOTIVOS_AJUSTE):
+                if f"{ICONES_AJUSTE[i]} {tipo}" == motivo_val:
+                    motivo = tipo
+                    break
+
+            if st.session_state.get("msg_ajuste"):
+                st.success(st.session_state.pop("msg_ajuste"))
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # ─── FOOTER BAR ───────────────────────────────────────────────────
+            indicador_texto = "Nenhum item selecionado" if not item_sel else f"{item_sel.split(' — ')[1]} selecionado"
+            indicador_cor   = "#D99F2A" if not item_sel else "#2ED297"
 
             st.markdown(f"""
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
-                <div style="background:#141210;border:1px solid #2A2624;border-radius:10px;padding:14px;text-align:center;">
-                    <div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">No sistema</div>
-                    <div style="font-size:22px;font-weight:700;color:#FFF8F0;">{sal:.0f} <span style="font-size:12px;font-weight:400;color:#8A7B72;">{info['unidade']}</span></div>
-                </div>
-                <div style="background:#141210;border:1px solid #2A2624;border-radius:10px;padding:14px;text-align:center;">
-                    <div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">Contado</div>
-                    <div style="font-size:22px;font-weight:700;color:#FFF8F0;">{f"{qtd_fis:.0f}" if qtd_fis is not None else "—"} <span style="font-size:12px;font-weight:400;color:#8A7B72;">{info['unidade']}</span></div>
-                </div>
-                <div style="background:#141210;border:1.5px solid {cor_diff}33;border-radius:10px;padding:14px;text-align:center;">
-                    <div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;">Diferença</div>
-                    <div style="font-size:22px;font-weight:700;color:{cor_diff};">{label_diff}</div>
+            <div style="margin-top:30px;border-top:1px solid #332B25;padding-top:20px;display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:8px;height:8px;background:{indicador_cor};border-radius:50%;box-shadow:0 0 6px {indicador_cor}88;"></div>
+                    <span style="font-size:12.5px;color:#8A7B72;">{indicador_texto}</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;background:#2A200B;border-radius:8px;border:1px solid #4A3510;margin-bottom:16px;">
-                <span style="font-size:16px;">💡</span>
-                <span style="font-size:13px;color:#D99F2A;">Selecione um item para ver o saldo do sistema e realizar o lançamento.</span>
-            </div>
-            """, unsafe_allow_html=True)
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # ── CARD 2: MOTIVO DO AJUSTE ──────────────────────────────────────
-        st.markdown("""
-        <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;">
-            <div style="padding:18px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #2A2624;">
-                <div style="width:36px;height:36px;background:#2A1F08;border:1px solid #4A3510;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#D99F2A;">🏷️</div>
-                <div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Motivo do ajuste</div>
-                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Classifique o motivo para rastreabilidade e auditoria</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;">', unsafe_allow_html=True)
-
-        radio_ajuste = [f"{ICONES_AJUSTE[i]}\n{MOTIVOS_AJUSTE[i]}\n{SUBTIT_AJUSTE[i]}" for i in range(6)]
-        motivo_val = st.radio("Motivo do ajuste", 
-            [f"{ICONES_AJUSTE[i]} {MOTIVOS_AJUSTE[i]}" for i in range(6)], 
-            index=0, key=f"ajt_motivo_{reset_key}", label_visibility="collapsed")
-
-        motivo = ""
-        for i, tipo in enumerate(MOTIVOS_AJUSTE):
-            if f"{ICONES_AJUSTE[i]} {tipo}" == motivo_val:
-                motivo = tipo
-                break
-
-        if st.session_state.get("msg_ajuste"):
-            st.success(st.session_state.pop("msg_ajuste"))
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # ─── FOOTER BAR ───────────────────────────────────────────────────
-        indicador_texto = "Nenhum item selecionado" if not item_sel else f"{item_sel.split(' — ')[1]} selecionado"
-        indicador_cor   = "#D99F2A" if not item_sel else "#2ED297"
-
-        st.markdown(f"""
-        <div style="margin-top:30px;border-top:1px solid #332B25;padding-top:20px;display:flex;align-items:center;justify-content:space-between;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:8px;height:8px;background:{indicador_cor};border-radius:50%;box-shadow:0 0 6px {indicador_cor}88;"></div>
-                <span style="font-size:12.5px;color:#8A7B72;">{indicador_texto}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
-        col_space, col_cancel, col_confirm = st.columns([5, 2, 3])
-        with col_cancel:
-            st.markdown('<div class="btn-cancel">', unsafe_allow_html=True)
-            if st.button("🗑️ Cancelar", use_container_width=True, key="ajt_cancel"):
-                st.session_state["ajuste_reset_key"] = reset_key + 1
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-        with col_confirm:
-            st.markdown('<div class="btn-confirm-ajuste">', unsafe_allow_html=True)
-            if st.button("✓ Confirmar ajuste", use_container_width=True, key="btn_ajt"):
-                if not item_sel:    st.error("Por favor, selecione o item.")
-                elif qtd_fis is None: st.error("Por favor, insira a quantidade contada.")
-                elif tipo_mov is None: st.info("Nenhuma diferença encontrada entre o sistema e a contagem.")
-                else:
-                    registrar_movimento(tipo_mov, id_item, abs(diff), u["usuario"], motivo=motivo, obs=obs)
-                    st.session_state["msg_ajuste"] = f"✅ Ajuste registrado com sucesso! Novo saldo: {qtd_fis:.0f} {info['unidade']}"
+            st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+            col_space, col_cancel, col_confirm = st.columns([5, 2, 3])
+            with col_cancel:
+                st.markdown('<div class="btn-cancel">', unsafe_allow_html=True)
+                if st.button("🗑️ Cancelar", use_container_width=True, key="ajt_cancel"):
                     st.session_state["ajuste_reset_key"] = reset_key + 1
                     st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+            with col_confirm:
+                st.markdown('<div class="btn-confirm-ajuste">', unsafe_allow_html=True)
+                if st.button("✓ Confirmar ajuste", use_container_width=True, key="btn_ajt"):
+                    if not item_sel:    st.error("Por favor, selecione o item.")
+                    elif qtd_fis is None: st.error("Por favor, insira a quantidade contada.")
+                    elif tipo_mov is None: st.info("Nenhuma diferença encontrada entre o sistema e a contagem.")
+                    else:
+                        registrar_movimento(tipo_mov, id_item, abs(diff), u["usuario"], motivo=motivo, obs=obs)
+                        st.session_state["msg_ajuste"] = f"✅ Ajuste registrado com sucesso! Novo saldo: {qtd_fis:.0f} {info['unidade']}"
+                        st.session_state["ajuste_reset_key"] = reset_key + 1
+                        st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        with tab_import:
+            st.markdown("""
+            <div style="background:#1A1715;border-radius:12px 12px 0 0;border:1px solid #2A2624;border-bottom:none;padding:18px 24px;display:flex;align-items:center;gap:14px;">
+                <div style="width:36px;height:36px;background:#2A1F08;border:1px solid #4A3510;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#D99F2A;">📥</div>
+                <div>
+                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14.5px;font-weight:700;color:#FFF8F0;">Importar Relatório de Inventário</div>
+                    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#554A40;margin-top:2px;">Selecione o arquivo PDF para processar o inventário físico</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown('<div style="background:#1A1715;border-radius:0 0 12px 12px;border:1px solid #2A2624;border-top:none;padding:24px;margin-bottom:24px;">', unsafe_allow_html=True)
+            
+            uploaded_file = st.file_uploader("Arquivo PDF do Inventário", type=["pdf"], key="inventario_pdf_uploader", label_visibility="collapsed")
+            
+            if uploaded_file is not None:
+                from utils.swfast_parser import parse_inventario_pdf
+                
+                try:
+                    parsed_raw = parse_inventario_pdf(uploaded_file.read())
+                    if not parsed_raw:
+                        st.warning("Nenhum item válido foi encontrado no PDF. Verifique o formato do arquivo.")
+                    else:
+                        st.info(f"Foram lidos {len(parsed_raw)} itens do arquivo PDF.")
+                        
+                        df_map = listar_mapeamentos()
+                        df_map['codigo_swfast'] = df_map['codigo_swfast'].astype(str).str.strip()
+                        map_dict = {row['codigo_swfast']: row['id_item'] for _, row in df_map.iterrows()}
+                        
+                        # Preparar dados para exibição
+                        list_data = []
+                        mapped_count = 0
+                        unmapped_count = 0
+                        movs_para_confirmar = []
+                        
+                        for item in parsed_raw:
+                            cod_sw = item["codigo_swfast"].strip()
+                            nome_sw = item["nome_swfast"]
+                            contada = item["contada"]
+                            
+                            id_item = map_dict.get(cod_sw)
+                            
+                            if id_item:
+                                info_it = itens[itens["id_item"] == id_item]
+                                if not info_it.empty:
+                                    nome_erp = info_it.iloc[0]["nome"]
+                                    unidade = info_it.iloc[0]["unidade"]
+                                else:
+                                    nome_erp = "Item ERP não encontrado"
+                                    unidade = ""
+                                saldo_sis = saldo_item(id_item)
+                                diff = contada - saldo_sis
+                                mapped_count += 1
+                                status = "Mapeado"
+                                
+                                if diff != 0:
+                                    tipo_mov = "AJUSTE_POS" if diff > 0 else "AJUSTE_NEG"
+                                    movs_para_confirmar.append({
+                                        "id_item": id_item,
+                                        "nome_item": nome_erp,
+                                        "quantidade": abs(diff),
+                                        "tipo": tipo_mov,
+                                        "operador": u["usuario"],
+                                        "motivo": "Inventário físico",
+                                        "obs": f"Ajuste automático via PDF (SWFast Cod {cod_sw})"
+                                    })
+                            else:
+                                nome_erp = "❌ NÃO MAPEADO"
+                                saldo_sis = 0
+                                diff = contada
+                                unidade = ""
+                                status = "Não Mapeado"
+                                unmapped_count += 1
+                                
+                            list_data.append({
+                                "Código SWFast": cod_sw,
+                                "Item SWFast": nome_sw,
+                                "ID Item ERP": id_item or "—",
+                                "Item ERP": nome_erp,
+                                "Saldo Sistema": float(saldo_sis),
+                                "Contado (Físico)": float(contada),
+                                "Diferença": float(diff),
+                                "Unidade": unidade,
+                                "Status": status
+                            })
+                            
+                        df_display = pd.DataFrame(list_data)
+                        
+                        # KPIs do Relatório
+                        st.markdown(f"""
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+                            <div style="background:#141210;border:1px solid #2A2624;border-radius:10px;padding:12px;text-align:center;">
+                                <div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Itens Mapeados</div>
+                                <div style="font-size:20px;font-weight:700;color:#2ED297;">{mapped_count}</div>
+                            </div>
+                            <div style="background:#141210;border:1px solid #2A2624;border-radius:10px;padding:12px;text-align:center;">
+                                <div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Itens Não Mapeados</div>
+                                <div style="font-size:20px;font-weight:700;color:#EF4444;">{unmapped_count}</div>
+                            </div>
+                            <div style="background:#141210;border:1px solid #2A2624;border-radius:10px;padding:12px;text-align:center;">
+                                <div style="font-size:10px;color:#8A7B72;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">Ajustes Necessários</div>
+                                <div style="font-size:20px;font-weight:700;color:#D99F2A;">{len(movs_para_confirmar)}</div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.markdown("### Visualização dos Itens")
+                        st.dataframe(
+                            df_display, 
+                            column_config={
+                                "Saldo Sistema": st.column_config.NumberColumn(format="%.2f"),
+                                "Contado (Físico)": st.column_config.NumberColumn(format="%.2f"),
+                                "Diferença": st.column_config.NumberColumn(format="%.2f"),
+                            },
+                            use_container_width=True, 
+                            hide_index=True
+                        )
+                        
+                        if unmapped_count > 0:
+                            st.warning(f"Atenção: existem {unmapped_count} itens no inventário que não estão mapeados no ERP. Estes não serão ajustados até que sejam mapeados.")
+                            
+                        st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
+                        
+                        if movs_para_confirmar:
+                            st.markdown('<div class="btn-confirm-ajuste">', unsafe_allow_html=True)
+                            if st.button(f"✓ Confirmar Todos os {len(movs_para_confirmar)} Ajustes em Lote", use_container_width=True, key="btn_confirm_pdf_batch"):
+                                registrar_movimento_batch(movs_para_confirmar)
+                                st.success(f"✅ {len(movs_para_confirmar)} ajustes aplicados com sucesso no banco de dados!")
+                                st.session_state["msg_ajuste"] = f"✅ Importação de PDF concluída: {len(movs_para_confirmar)} ajustes realizados."
+                                st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        else:
+                            st.info("Nenhuma divergência de saldo para ajustar nos itens mapeados.")
+                            
+                except Exception as ex:
+                    st.error(f"Erro ao processar o arquivo PDF: {ex}")
+            else:
+                st.info("Aguardando upload do arquivo PDF...")
+                
             st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -1768,6 +2509,9 @@ with col_conteudo:
         }
 
         /* Botão Exportar */
+        div.element-container:has(.btn-export) + div.element-container button,
+        div.element-container:has(.btn-export) button,
+        .btn-export button,
         .btn-export > div > button {
             background: #1A1715 !important;
             color: #FFF8F0 !important;
@@ -1776,10 +2520,15 @@ with col_conteudo:
             font-size: 13px !important;
             font-weight: 600 !important;
             height: 40px !important;
+            transition: all 0.2s ease !important;
         }
+        div.element-container:has(.btn-export) + div.element-container button:hover,
+        div.element-container:has(.btn-export) button:hover,
+        .btn-export button:hover,
         .btn-export > div > button:hover {
             background: #332B25 !important;
             border-color: #554A40 !important;
+            color: #fff !important;
         }
 
         .stDataFrame { border-radius: 0 0 12px 12px !important; border: 1px solid #2A2624 !important; }
@@ -1815,7 +2564,7 @@ with col_conteudo:
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-        aba1, aba2 = st.tabs(["📦 Estoque Atual", "📋 Histórico"])
+        aba1, aba2, aba3 = st.tabs(["📦 Estoque Atual", "🕐 Estoque por Data", "📋 Histórico de Movimentos"])
 
         with aba1:
             df = listar_estoque()
@@ -1954,6 +2703,112 @@ with col_conteudo:
             """, unsafe_allow_html=True)
 
         with aba2:
+            st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
+            st.markdown("""
+            <div style="background:linear-gradient(135deg,#1A1A2E,#16213E);border:1px solid #2A3A60;border-radius:14px;padding:20px 24px;margin-bottom:20px;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                    <span style="font-size:24px;">🕐</span>
+                    <div>
+                        <div style="font-size:16px;font-weight:700;color:#7BA1F2;">Estoque Retroativo por Data</div>
+                        <div style="font-size:12px;color:#4A6A9A;margin-top:2px;">Consulte qual era o saldo de cada item do estoque em qualquer data do passado</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            hoje_tm = date.today()
+            col_tm1, col_tm2 = st.columns([3, 7])
+            with col_tm1:
+                data_ref = st.date_input("📅 Selecione a data de referência", value=hoje_tm - timedelta(days=1), max_value=hoje_tm, key="consulta_tm_data")
+
+            # Reconstrói saldo: pega saldo atual e desfaz movimentos APÓS data_ref
+            df_base = listar_estoque()
+            itens_c = listar_itens()
+            from utils.data import obter_movimentos_apos_data
+            movs_depois = obter_movimentos_apos_data(data_ref)
+
+            if not df_base.empty:
+                if not itens_c.empty:
+                    cols_c = [c for c in ["id_item", "estoque_minimo", "categoria", "unidade"] if c in itens_c.columns]
+                    df_base = df_base.merge(itens_c[cols_c], on="id_item", how="left")
+
+                df_base["s"] = pd.to_numeric(df_base["saldo_atual"], errors="coerce").fillna(0)
+                df_base["mn"] = pd.to_numeric(df_base.get("estoque_minimo", 0), errors="coerce").fillna(0)
+
+                delta_por_item = {}
+                if not movs_depois.empty:
+                    for _, mv in movs_depois.iterrows():
+                        iid = mv["id_item"]
+                        qtd = float(mv.get("quantidade", 0) or 0)
+                        tipo = mv["tipo"]
+                        if tipo == "ENTRADA":
+                            delta_por_item[iid] = delta_por_item.get(iid, 0) - qtd
+                        elif tipo == "SAÍDA":
+                            delta_por_item[iid] = delta_por_item.get(iid, 0) + qtd
+
+                rows_tm = []
+                for _, r in df_base.iterrows():
+                    iid = r["id_item"]
+                    s_atual = float(r["s"])
+                    delta = delta_por_item.get(iid, 0)
+                    s_hist = max(0, s_atual + delta)
+                    rows_tm.append({
+                        "Status": status_item(s_hist, float(r["mn"])),
+                        "Código": iid,
+                        "Produto": r["nome"],
+                        "Categoria": r.get("categoria", ""),
+                        "Saldo na Data": s_hist,
+                        "Mínimo": float(r["mn"]),
+                        "Und": r.get("unidade", "")
+                    })
+
+                df_tm = pd.DataFrame(rows_tm)
+
+                st.markdown('<div style="display:flex;align-items:center;gap:12px;margin-top:16px;margin-bottom:16px;">', unsafe_allow_html=True)
+                c_busca_tm, c_cat_tm = st.columns([5, 3])
+                with c_busca_tm:
+                    busca_tm = st.text_input("Buscar produto retroativo", placeholder="🔍 Buscar por nome ou código...", key="b_tm", label_visibility="collapsed")
+                with c_cat_tm:
+                    cats_tm = ["Todas as categorias"] + sorted(df_tm["Categoria"].dropna().unique().tolist())
+                    cat_tm = st.selectbox("Categoria retroativa", cats_tm, key="c_tm", label_visibility="collapsed")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                dt_tm_filtrado = df_tm.copy()
+                if busca_tm:
+                    m_tm = (dt_tm_filtrado["Código"].str.contains(busca_tm, case=False, na=False) |
+                            dt_tm_filtrado["Produto"].str.contains(busca_tm, case=False, na=False))
+                    dt_tm_filtrado = dt_tm_filtrado[m_tm]
+                if cat_tm != "Todas as categorias":
+                    dt_tm_filtrado = dt_tm_filtrado[dt_tm_filtrado["Categoria"] == cat_tm]
+
+                st.markdown('<div style="border-radius:12px;overflow:hidden;border:1px solid #2A2624;">', unsafe_allow_html=True)
+                st.dataframe(
+                    dt_tm_filtrado,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Saldo na Data": st.column_config.NumberColumn(format="%.0f"),
+                        "Mínimo": st.column_config.NumberColumn(format="%.0f"),
+                    }
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                csv_tm = dt_tm_filtrado.to_csv(index=False, sep=";").encode("utf-8-sig")
+                st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+                col_btn_tm, _ = st.columns([4, 6])
+                with col_btn_tm:
+                    st.markdown('<div class="btn-export">', unsafe_allow_html=True)
+                    st.download_button(
+                        f"📊 Exportar planilha do dia {data_ref.strftime('%d/%m/%Y')}",
+                        csv_tm,
+                        f"estoque_{data_ref.strftime('%Y%m%d')}.csv",
+                        "text/csv",
+                        key="dl_csv_tm",
+                        use_container_width=True
+                    )
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+        with aba3:
             dm = listar_movimentos()
             if dm.empty:
                 st.info("Nenhum movimento ainda.")
@@ -2019,6 +2874,9 @@ with col_conteudo:
             border-color: #E85D04 !important;
             color: #fff !important;
         }
+        div.element-container:has(.btn-periodo) + div.element-container button,
+        div.element-container:has(.btn-periodo) button,
+        .btn-periodo button,
         .btn-periodo > div > button {
             background: #1A1715 !important;
             color: #8A7B72 !important;
@@ -2030,11 +2888,17 @@ with col_conteudo:
             padding: 0 14px !important;
             transition: all 0.15s !important;
         }
+        div.element-container:has(.btn-periodo) + div.element-container button:hover,
+        div.element-container:has(.btn-periodo) button:hover,
+        .btn-periodo button:hover,
         .btn-periodo > div > button:hover {
             background: #2A2420 !important;
             color: #FFF8F0 !important;
             border-color: #554A40 !important;
         }
+        div.element-container:has(.btn-periodo-ativo) + div.element-container button,
+        div.element-container:has(.btn-periodo-ativo) button,
+        .btn-periodo-ativo button,
         .btn-periodo-ativo > div > button {
             background: rgba(232,93,4,0.15) !important;
             color: #E85D04 !important;
@@ -2045,6 +2909,9 @@ with col_conteudo:
             height: 34px !important;
             padding: 0 14px !important;
         }
+        div.element-container:has(.btn-export) + div.element-container button,
+        div.element-container:has(.btn-export) button,
+        .btn-export button,
         .btn-export > div > button {
             background: #1A1715 !important;
             color: #FFF8F0 !important;
@@ -2081,7 +2948,7 @@ with col_conteudo:
             st.markdown('<div style="height:20px;"></div>', unsafe_allow_html=True)
             st.markdown('<div class="btn-export">', unsafe_allow_html=True)
             if st.button("↻ Atualizar", use_container_width=True, key="dash_refresh"):
-                _ler_cached.clear()
+                limpar_cache()
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2688,9 +3555,8 @@ with col_conteudo:
                 data_ref = st.session_state.get("tm_data_usada", data_tm)
 
                 # Reconstrói saldo: pega saldo atual e desfaz movimentos APÓS data_ref
-                movs_depois = pd.DataFrame()
-                if not movs_all.empty:
-                    movs_depois = movs_all[movs_all["timestamp"].dt.date > data_ref]
+                from utils.data import obter_movimentos_apos_data
+                movs_depois = obter_movimentos_apos_data(data_ref)
 
                 # Deltas a reverter por item
                 delta_por_item = {}
@@ -2807,6 +3673,10 @@ with col_conteudo:
         }
         .stTextInput label { display:none !important; }
 
+        /* Botão Atualizar (Verde Plan) */
+        div.element-container:has(.btn-plan) + div.element-container button,
+        div.element-container:has(.btn-plan) button,
+        .btn-plan button,
         .btn-plan > div > button {
             background: #0F4A3A !important;
             color: #2ED297 !important;
@@ -2815,10 +3685,20 @@ with col_conteudo:
             font-size: 13px !important;
             font-weight: 700 !important;
             height: 40px !important;
+            transition: all 0.2s ease !important;
         }
+        div.element-container:has(.btn-plan) + div.element-container button:hover,
+        div.element-container:has(.btn-plan) button:hover,
+        .btn-plan button:hover,
         .btn-plan > div > button:hover {
             background: #144A2A !important;
+            color: #fff !important;
         }
+
+        /* Botão Plan Outline (Excel / Imprimir) */
+        div.element-container:has(.btn-plan-outline) + div.element-container button,
+        div.element-container:has(.btn-plan-outline) button,
+        .btn-plan-outline button,
         .btn-plan-outline > div > button {
             background: #1A1715 !important;
             color: #FFF8F0 !important;
@@ -2827,7 +3707,21 @@ with col_conteudo:
             font-size: 13px !important;
             font-weight: 600 !important;
             height: 40px !important;
+            transition: all 0.2s ease !important;
         }
+        div.element-container:has(.btn-plan-outline) + div.element-container button:hover,
+        div.element-container:has(.btn-plan-outline) button:hover,
+        .btn-plan-outline button:hover,
+        .btn-plan-outline > div > button:hover {
+            background: #332B25 !important;
+            border-color: #554A40 !important;
+            color: #fff !important;
+        }
+
+        /* Botão Pedido */
+        div.element-container:has(.btn-pedido) + div.element-container button,
+        div.element-container:has(.btn-pedido) button,
+        .btn-pedido button,
         .btn-pedido > div > button {
             background: rgba(232,93,4,0.12) !important;
             color: #E85D04 !important;
@@ -2837,9 +3731,66 @@ with col_conteudo:
             font-weight: 700 !important;
             height: 34px !important;
             padding: 0 12px !important;
+            transition: all 0.2s ease !important;
         }
+        div.element-container:has(.btn-pedido) + div.element-container button:hover,
+        div.element-container:has(.btn-pedido) button:hover,
+        .btn-pedido button:hover,
         .btn-pedido > div > button:hover {
             background: rgba(232,93,4,0.25) !important;
+            color: #ff8a3d !important;
+        }
+
+        /* ── Filtros Rápidos (Todos, Urgente, Em breve, Estável) ── */
+        /* Inativos */
+        div.element-container:has(.btn-filter-todos) + div.element-container button {
+            background: #1A1715 !important; color: #8A7B72 !important; border: 1px solid #332B25 !important;
+            border-radius: 8px !important; font-size: 13px !important; height: 38px !important; transition: all 0.2s ease !important;
+        }
+        div.element-container:has(.btn-filter-todos) + div.element-container button:hover {
+            background: #2A2420 !important; color: #FFF8F0 !important;
+        }
+        div.element-container:has(.btn-filter-urgente) + div.element-container button {
+            background: rgba(239, 68, 68, 0.05) !important; color: #FCA5A5 !important; border: 1px solid rgba(239, 68, 68, 0.2) !important;
+            border-radius: 8px !important; font-size: 13px !important; height: 38px !important; transition: all 0.2s ease !important;
+        }
+        div.element-container:has(.btn-filter-urgente) + div.element-container button:hover {
+            background: rgba(239, 68, 68, 0.15) !important; color: #FFF8F0 !important;
+        }
+        div.element-container:has(.btn-filter-breve) + div.element-container button {
+            background: rgba(245, 158, 11, 0.05) !important; color: #FDE047 !important; border: 1px solid rgba(245, 158, 11, 0.2) !important;
+            border-radius: 8px !important; font-size: 13px !important; height: 38px !important; transition: all 0.2s ease !important;
+        }
+        div.element-container:has(.btn-filter-breve) + div.element-container button:hover {
+            background: rgba(245, 158, 11, 0.15) !important; color: #FFF8F0 !important;
+        }
+        div.element-container:has(.btn-filter-estavel) + div.element-container button {
+            background: rgba(34, 197, 94, 0.05) !important; color: #86EFAC !important; border: 1px solid rgba(34, 197, 94, 0.2) !important;
+            border-radius: 8px !important; font-size: 13px !important; height: 38px !important; transition: all 0.2s ease !important;
+        }
+        div.element-container:has(.btn-filter-estavel) + div.element-container button:hover {
+            background: rgba(34, 197, 94, 0.15) !important; color: #FFF8F0 !important;
+        }
+
+        /* Ativos */
+        div.element-container:has(.btn-filter-active-todos) + div.element-container button {
+            background: #332B25 !important; color: #FFF8F0 !important; border: 1px solid #E85D04 !important; font-weight: 700 !important;
+            border-radius: 8px !important; font-size: 13px !important; height: 38px !important; transition: all 0.2s ease !important;
+        }
+        div.element-container:has(.btn-filter-active-urgente) + div.element-container button {
+            background: #EF4444 !important; color: #ffffff !important; border: none !important; font-weight: 700 !important;
+            border-radius: 8px !important; font-size: 13px !important; height: 38px !important; transition: all 0.2s ease !important;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25) !important;
+        }
+        div.element-container:has(.btn-filter-active-breve) + div.element-container button {
+            background: #F59E0B !important; color: #1A1208 !important; border: none !important; font-weight: 700 !important;
+            border-radius: 8px !important; font-size: 13px !important; height: 38px !important; transition: all 0.2s ease !important;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25) !important;
+        }
+        div.element-container:has(.btn-filter-active-estavel) + div.element-container button {
+            background: #22C55E !important; color: #ffffff !important; border: none !important; font-weight: 700 !important;
+            border-radius: 8px !important; font-size: 13px !important; height: 38px !important; transition: all 0.2s ease !important;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25) !important;
         }
         .stDataFrame { border-radius: 12px !important; border: 1px solid #2A2624 !important; }
         </style>
@@ -2890,7 +3841,7 @@ with col_conteudo:
             with cb3:
                 st.markdown('<div class="btn-plan">', unsafe_allow_html=True)
                 if st.button("↻ Atualizar", use_container_width=True, key="ref_plan"):
-                    _ler_cached.clear()
+                    limpar_cache()
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -3074,11 +4025,35 @@ with col_conteudo:
             busca_plan = st.text_input("Buscar produto", placeholder="🔍 Buscar produto...", key="bp1", label_visibility="collapsed")
         with f2:
             filtro_cols = st.columns(4)
-            filtros_opts = ["Todos", "🔴 Urgente", "🟡 Em breve", "🟢 Estável"]
-            filtro_sel = filtro_cols[0].button(f"Todos  {total}", key="ft_all",  use_container_width=True)
-            filtro_urg = filtro_cols[1].button(f"🚨 Urgente  {urgentes}", key="ft_urg", use_container_width=True)
-            filtro_brv = filtro_cols[2].button(f"⏳ Em breve  {breve}", key="ft_brv", use_container_width=True)
-            filtro_est = filtro_cols[3].button(f"✅ Estável  {estaveis}", key="ft_est", use_container_width=True)
+            filtro_ativo = st.session_state.get("plan_filter", "todos")
+            
+            # Todos
+            is_all_active = (filtro_ativo == "todos")
+            with filtro_cols[0]:
+                st.markdown(f'<div class="{"btn-filter-active-todos" if is_all_active else "btn-filter-todos"}">', unsafe_allow_html=True)
+                filtro_sel = st.button(f"Todos  {total}", key="ft_all", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            # Urgente
+            is_urg_active = (filtro_ativo == "urgente")
+            with filtro_cols[1]:
+                st.markdown(f'<div class="{"btn-filter-active-urgente" if is_urg_active else "btn-filter-urgente"}">', unsafe_allow_html=True)
+                filtro_urg = st.button(f"🚨 Urgente  {urgentes}", key="ft_urg", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            # Em breve
+            is_brv_active = (filtro_ativo == "breve")
+            with filtro_cols[2]:
+                st.markdown(f'<div class="{"btn-filter-active-breve" if is_brv_active else "btn-filter-breve"}">', unsafe_allow_html=True)
+                filtro_brv = st.button(f"⏳ Em breve  {breve}", key="ft_brv", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            # Estável
+            is_est_active = (filtro_ativo == "estavel")
+            with filtro_cols[3]:
+                st.markdown(f'<div class="{"btn-filter-active-estavel" if is_est_active else "btn-filter-estavel"}">', unsafe_allow_html=True)
+                filtro_est = st.button(f"✅ Estável  {estaveis}", key="ft_est", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
         # Filtro de estado (session_state)
         if filtro_urg: st.session_state["plan_filter"] = "urgente"
@@ -3269,10 +4244,19 @@ with col_conteudo:
         header("🧩","Composição de Produtos","Defina quais ingredientes compõem cada Panelinha")
         import pandas as pd
         from pathlib import Path
-        from utils.data import listar_composicao, _salvar, _ler_cached
+        from utils.data import listar_composicao, _salvar, limpar_cache
 
         df_comp = listar_composicao()
         itens   = listar_itens()
+
+        custos_dict = {}
+        if not itens.empty:
+            for _, r in itens.iterrows():
+                try:
+                    c_val = float(pd.to_numeric(r.get("custo_unitario", 0), errors="coerce") or 0.0)
+                except Exception:
+                    c_val = 0.0
+                custos_dict[r["id_item"]] = c_val
 
         # Produtos compostos existentes
         if not df_comp.empty:
@@ -3280,11 +4264,36 @@ with col_conteudo:
             for prod in df_comp["id_produto"].unique():
                 grupo = df_comp[df_comp["id_produto"]==prod]
                 nome_prod = grupo.iloc[0]["nome_produto"]
-                st.markdown(f"**{prod} — {nome_prod}**")
+                
+                # Calcular custo total
+                custo_total = 0.0
                 for _, r in grupo.iterrows():
+                    ing_id = r['id_ingrediente']
+                    try:
+                        qtd_req = float(r['quantidade'])
+                    except Exception:
+                        qtd_req = 0.0
+                    custo_total += custos_dict.get(ing_id, 0.0) * qtd_req
+                
+                # Exibir cabeçalho e card de custo total
+                col_prod, col_cost = st.columns([7, 3])
+                with col_prod:
+                    st.markdown(f"**{prod} — {nome_prod}**")
+                with col_cost:
+                    st.markdown(f"""
+                    <div style="background:#1A1715;border:1px solid #E85D04;border-radius:8px;padding:6px 12px;text-align:center;">
+                        <span style="font-size:10px;color:#8A7B72;font-weight:700;text-transform:uppercase;">Custo Sugerido Receita</span>
+                        <div style="font-size:14px;color:#FFF8F0;font-weight:700;">R$ {custo_total:,.2f}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                for _, r in grupo.iterrows():
+                    custo_ing = custos_dict.get(r['id_ingrediente'], 0.0)
+                    custo_subtotal = custo_ing * float(r['quantidade'])
                     st.markdown(
-                        f"&nbsp;&nbsp;&nbsp;↳ `{r['id_ingrediente']}` {r['nome_ingrediente']} × **{r['quantidade']} {r['unidade']}**"
+                        f"&nbsp;&nbsp;&nbsp;↳ `{r['id_ingrediente']}` {r['nome_ingrediente']} × **{r['quantidade']} {r['unidade']}** (Custo: R$ {custo_ing:,.2f} | Subtotal: R$ {custo_subtotal:,.2f})"
                     )
+                st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
             st.markdown("---")
 
         # Formulário para adicionar nova linha
@@ -3338,7 +4347,7 @@ with col_conteudo:
                 }])
                 df_novo = pd.concat([df_comp, nova], ignore_index=True)
                 _salvar("composicao", df_novo)
-                _ler_cached.clear()
+                limpar_cache()
                 st.session_state["msg_comp"] = f"✅ {nome_ing} adicionado à composição de {nome_pan}"
                 st.rerun()
 
@@ -3358,7 +4367,7 @@ with col_conteudo:
                 idx_rem = opcoes_rem[rem_sel]
                 df_comp = df_comp.drop(idx_rem).reset_index(drop=True)
                 _salvar("composicao", df_comp)
-                _ler_cached.clear()
+                limpar_cache()
                 st.success("✅ Removido!")
                 st.rerun()
 
